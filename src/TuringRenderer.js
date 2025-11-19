@@ -113,6 +113,12 @@ export class TuringRenderer {
         }
     }
 
+    updateMachine(newTuringMachine) {
+        // Actualizar referencia a la nueva máquina
+        this.turingMachine = newTuringMachine;
+        this.createTape();
+    }
+
     animateStep() {
         // Animación suave cuando se mueve el cabezal (opcional)
         // Se puede implementar con GSAP o tweening manual

@@ -1,30 +1,108 @@
 /**
  * Clase que representa la lógica de una Máquina de Turing
+ * Soporta dos módulos intercambiables: SUMA y RESTA (números binarios)
  */
 export class TuringMachine {
-    constructor(initialTape = ['_']) {
+    constructor(initialTape = ['_'], module = 'SUMA') {
         this.tape = [...initialTape];
         this.headPosition = 0;
         this.currentState = 'q0';
-        this.haltState = 'qH';
+        this.haltState = 'qFIN'; // Estado de halt actualizado
         this.stepCount = 0;
+        this.currentModule = module; // 'SUMA' o 'RESTA'
         
         // Guardar estado inicial para reset
         this.initialTape = [...initialTape];
         this.initialState = 'q0';
+        this.initialModule = module;
         
-        // Definir tabla de transiciones
-        // Formato: { 'estado,símbolo': ['nuevoEstado', 'nuevoSímbolo', 'dirección'] }
+        // Definir tabla de transiciones según el módulo
         this.transitions = this.defineTransitions();
     }
 
     defineTransitions() {
-        // Ejemplo: Máquina que invierte bits (0 -> 1, 1 -> 0)
+        if (this.currentModule === 'SUMA') {
+            return this.moduloSuma();
+        } else if (this.currentModule === 'RESTA') {
+            return this.moduloResta();
+        }
+    }
+
+    /**
+     * MÓDULO DE SUMA - Incrementa en 1 un número binario (operación unaria)
+     * Entrada: un número binario seguido de '_'
+     * Ejemplo 1: 101_ (5 + 1 = 6 en decimal = 110 en binario)
+     * 
+     * Tabla de transiciones:
+     * q0,1 -> q0,1,R
+     * q0,0 -> q1,1,R
+     * q0,_ -> qFIN,_,S
+     * q1,1 -> q1,1,R
+     * q1,_ -> q2,_,L
+     * q2,1 -> qFIN,_,S
+     */
+    moduloSuma() {
         return {
-            'q0,0': ['q0', '1', 'R'],
-            'q0,1': ['q0', '0', 'R'],
-            'q0,_': ['qH', '_', 'N'], // Halt cuando encuentra espacio vacío
+            // Estado q0
+            'q0,1': ['q0', '1', 'R'],
+            'q0,0': ['q1', '1', 'R'],
+            'q0,_': ['qFIN', '_', 'N'], // S = Stay (N = No move)
+            
+            // Estado q1
+            'q1,1': ['q1', '1', 'R'],
+            'q1,_': ['q2', '_', 'L'],
+            
+            // Estado q2
+            'q2,1': ['qFIN', '_', 'N'], // S = Stay
         };
+    }
+
+    /**
+     * MÓDULO DE RESTA - Decrementa en 1 un número binario (operación unaria)
+     * Entrada: un número binario seguido de '_'
+     * Ejemplo: 101_ (5 - 1 = 4 en decimal = 100 en binario)
+     * 
+     * Tabla de transiciones:
+     * q0,1 -> q0,1,R
+     * q0,0 -> q0,0,R
+     * q0,_ -> q1,_,L
+     * q1,1 -> q2,_,L
+     * q1,0 -> qFIN,_,S
+     * q1,_ -> q3,_,L
+     * q2,1 -> q2,1,L
+     * q2,0 -> q2,0,L
+     * q2,_ -> q3,_,R
+     * q3,1 -> q0,_,R
+     */
+    moduloResta() {
+        return {
+            // Estado q0
+            'q0,1': ['q0', '1', 'R'],
+            'q0,0': ['q0', '0', 'R'],
+            'q0,_': ['q1', '_', 'L'],
+            
+            // Estado q1
+            'q1,1': ['q2', '_', 'L'],
+            'q1,0': ['qFIN', '_', 'N'], // S = Stay
+            'q1,_': ['q3', '_', 'L'],
+            
+            // Estado q2
+            'q2,1': ['q2', '1', 'L'],
+            'q2,0': ['q2', '0', 'L'],
+            'q2,_': ['q3', '_', 'R'],
+            
+            // Estado q3
+            'q3,1': ['q0', '_', 'R'],
+        };
+    }
+
+    /**
+     * Cambiar el módulo de operación (simula cambio físico de cabezal)
+     */
+    changeModule(newModule) {
+        this.currentModule = newModule;
+        this.initialModule = newModule;
+        this.transitions = this.defineTransitions();
     }
 
     getCurrentSymbol() {
@@ -84,9 +162,15 @@ export class TuringMachine {
         this.headPosition = 0;
         this.currentState = this.initialState;
         this.stepCount = 0;
+        this.currentModule = this.initialModule;
+        this.transitions = this.defineTransitions();
     }
 
     getTapeSegment(start, end) {
         return this.tape.slice(start, end);
+    }
+
+    getModuleName() {
+        return this.currentModule;
     }
 }

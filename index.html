@@ -9,17 +9,54 @@
 <body>
     <div id="app">
         <div id="controls">
-            <h1>Máquina de Turing</h1>
-            <div class="control-panel">
-                <button id="startBtn">Iniciar</button>
-                <button id="pauseBtn">Pausar</button>
-                <button id="resetBtn">Reiniciar</button>
-                <button id="stepBtn">Paso a Paso</button>
+            <h1>Máquina de Turing - Calculadora Binaria</h1>
+            
+            <!-- Selector de Módulo -->
+            <div class="module-selector">
+                <h3>Módulo Activo:</h3>
+                <div class="module-buttons">
+                    <button id="moduleSumaBtn" class="module-btn active">➕ SUMA</button>
+                    <button id="moduleRestaBtn" class="module-btn">➖ RESTA</button>
+                </div>
+                <p class="module-info">Simula cambiar físicamente el cabezal de la máquina</p>
             </div>
+            
+            <!-- Input de Cinta -->
+            <div class="tape-input-section">
+                <h3>Entrada de Cinta:</h3>
+                <div class="input-group">
+                    <input type="text" id="tapeInput" placeholder="Ej: 101" pattern="[01]+" maxlength="20">
+                    <button id="loadTapeBtn">📝 Cargar Cinta</button>
+                </div>
+                <p class="input-info">Ingresa un número binario (solo 0 y 1)</p>
+            </div>
+            
+            <!-- Controles de Ejecución -->
+            <div class="control-panel">
+                <button id="startBtn">▶️ Iniciar</button>
+                <button id="pauseBtn">⏸️ Pausar</button>
+                <button id="resetBtn">🔄 Reiniciar</button>
+                <button id="stepBtn">⏭️ Paso</button>
+            </div>
+            
+            <!-- Panel de Información -->
             <div class="info-panel">
+                <div>Módulo: <span id="currentModule">SUMA</span></div>
                 <div>Estado: <span id="currentState">q0</span></div>
                 <div>Símbolo: <span id="currentSymbol">-</span></div>
                 <div>Pasos: <span id="stepCount">0</span></div>
+            </div>
+            
+            <!-- Panel de Salida -->
+            <div class="output-panel">
+                <h3>🔍 Visualización de Cinta:</h3>
+                <div class="tape-display">
+                    <div id="tapeVisualization" class="tape-content">-</div>
+                </div>
+                <div class="result-section">
+                    <div class="result-label">Resultado:</div>
+                    <div id="resultOutput" class="result-value">Esperando...</div>
+                </div>
             </div>
         </div>
         <div id="canvas-container"></div>
