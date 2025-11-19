@@ -18,14 +18,14 @@ class App {
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x1a1a2e);
 
-        // Cámara
+        // Cámara - vista cenital (desde arriba) para ver los símbolos
         this.camera = new THREE.PerspectiveCamera(
-            75,
+            60,
             this.container.clientWidth / this.container.clientHeight,
             0.1,
             1000
         );
-        this.camera.position.set(0, 5, 10);
+        this.camera.position.set(0, 8, 25); // Vista desde el frente
         this.camera.lookAt(0, 0, 0);
 
         // Renderer
@@ -47,8 +47,8 @@ class App {
         directionalLight.position.set(5, 10, 5);
         this.scene.add(directionalLight);
 
-        // Grid helper
-        const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
+        // Grid helper - más grande para la cinta de 64 celdas
+        const gridHelper = new THREE.GridHelper(100, 100, 0x444444, 0x222222);
         this.scene.add(gridHelper);
 
         // Redimensionamiento
@@ -56,10 +56,15 @@ class App {
     }
 
     initTuringMachine() {
-        // Inicializar máquina de Turing con una cinta de ejemplo para SUMA
-        // Formato: número binario seguido de '_' (operación unaria: +1)
-        // Ejemplo: 101_ (5 + 1 = 6 en binario: 110)
-        const initialTape = ['1', '0', '1', '_', '_', '_', '_', '_', '_', '_', '_', '_', '_'];
+        // Inicializar máquina de Turing con una cinta de 64 celdas
+        // Formato: número binario seguido de espacios en blanco
+        // Ejemplo: 101 seguido de 61 guiones bajos
+        const initialTape = ['1', '0', '1'];
+        // Agregar 61 espacios en blanco para completar 64 celdas
+        for (let i = 0; i < 61; i++) {
+            initialTape.push('_');
+        }
+        
         this.turingMachine = new TuringMachine(initialTape, 'SUMA');
         
         // Renderizador visual de la máquina
@@ -246,8 +251,12 @@ class App {
             return;
         }
         
-        // Crear la cinta con el input + espacios en blanco
-        const newTape = [...inputValue.split(''), '_', '_', '_', '_', '_', '_', '_', '_', '_', '_'];
+        // Crear la cinta con el input + 64 celdas totales
+        const newTape = [...inputValue.split('')];
+        const remainingCells = 64 - newTape.length;
+        for (let i = 0; i < remainingCells; i++) {
+            newTape.push('_');
+        }
         
         // Obtener módulo actual
         const currentModule = this.turingMachine.currentModule;
@@ -283,7 +292,11 @@ class App {
         
         // Usar el valor del input si existe, sino usar valor por defecto
         const inputValue = this.tapeInput.value.trim() || '101';
-        const newTape = [...inputValue.split(''), '_', '_', '_', '_', '_', '_', '_', '_', '_', '_'];
+        const newTape = [...inputValue.split('')];
+        const remainingCells = 64 - newTape.length;
+        for (let i = 0; i < remainingCells; i++) {
+            newTape.push('_');
+        }
         
         // Reiniciar máquina con nuevo módulo
         this.turingMachine = new TuringMachine(newTape, moduleName);
