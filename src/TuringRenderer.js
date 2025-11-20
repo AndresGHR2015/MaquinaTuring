@@ -17,13 +17,92 @@ export class TuringRenderer {
         this.previousHeadPosition = 0; // Para detectar movimientos
         this.visualOffset = 0; // Offset visual para simular el movimiento de la cinta
         
-        // Parámetros para el óvalo/pista
-        this.straightLength = 15; // Longitud de los lados rectos
-        this.curveRadius = 8;     // Radio de las curvas en los extremos
+        // Parámetros para el óvalo/pista (ajustados para 64 celdas juntas)
+        // Con celdas de 0.8 de ancho, 64 celdas = 51.2 unidades de perímetro aproximado
+        this.straightLength = 25; // Longitud de los lados rectos
+        this.curveRadius = 5;     // Radio de las curvas en los extremos
         
         this.scene.add(this.tapeGroup);
+        this.createBelt(); // Crear la correa primero (para que quede debajo)
         this.createTape();
         this.createHead();
+    }
+
+    /**
+     * Crea la correa que va debajo de la cinta
+     */
+    createBelt() {
+        // Parámetros ligeramente más pequeños que la pista
+        const straightLength = this.straightLength * 0.99;
+        const curveRadius = this.curveRadius * 0.95;
+        const halfStraight = straightLength / 2;
+        const tubeRadius = 0.3; // Radio del tubo (grosor de la correa)
+        
+        // Crear la curva que define el camino de la correa
+        const curve = new THREE.CurvePath();
+        
+        // Línea superior (izquierda a derecha)
+        curve.add(new THREE.LineCurve3(
+            new THREE.Vector3(-halfStraight, curveRadius, 0),
+            new THREE.Vector3(halfStraight, curveRadius, 0)
+        ));
+        
+        // Curva derecha (semicírculo superior a inferior)
+        const rightCurve = new THREE.EllipseCurve(
+            halfStraight, 0,  // centro
+            curveRadius, curveRadius,  // radios x, y
+            Math.PI / 2, -Math.PI / 2,  // ángulo inicio, ángulo fin
+            true, // sentido horario
+            0  // rotación
+        );
+        const rightCurve3D = new THREE.CurvePath();
+        const points = rightCurve.getPoints(32);
+        for (let i = 0; i < points.length - 1; i++) {
+            rightCurve3D.add(new THREE.LineCurve3(
+                new THREE.Vector3(points[i].x, points[i].y, 0),
+                new THREE.Vector3(points[i + 1].x, points[i + 1].y, 0)
+            ));
+        }
+        curve.add(rightCurve3D);
+        
+        // Línea inferior (derecha a izquierda)
+        curve.add(new THREE.LineCurve3(
+            new THREE.Vector3(halfStraight, -curveRadius, 0),
+            new THREE.Vector3(-halfStraight, -curveRadius, 0)
+        ));
+        
+        // Curva izquierda (semicírculo inferior a superior)
+        const leftCurve = new THREE.EllipseCurve(
+            -halfStraight, 0,  // centro
+            curveRadius, curveRadius,  // radios x, y
+            -Math.PI / 2, Math.PI / 2,  // ángulo inicio, ángulo fin
+            true, // sentido horario
+            0  // rotación
+        );
+        const leftCurve3D = new THREE.CurvePath();
+        const leftPoints = leftCurve.getPoints(32);
+        for (let i = 0; i < leftPoints.length - 1; i++) {
+            leftCurve3D.add(new THREE.LineCurve3(
+                new THREE.Vector3(leftPoints[i].x, leftPoints[i].y, 0),
+                new THREE.Vector3(leftPoints[i + 1].x, leftPoints[i + 1].y, 0)
+            ));
+        }
+        curve.add(leftCurve3D);
+        
+        // Crear geometría de tubo siguiendo la curva
+        const geometry = new THREE.TubeGeometry(curve, 128, tubeRadius, 16, true);
+        const material = new THREE.MeshStandardMaterial({
+            color: 0x2c2c2c, // Gris oscuro
+            metalness: 0.3,
+            roughness: 0.7
+        });
+        
+        const belt = new THREE.Mesh(geometry, material);
+        
+        // Posicionar la correa ligeramente debajo de las celdas
+        belt.position.y = -0.1; // Debajo de las celdas, pero más cerca
+        
+        this.scene.add(belt);
     }
 
     createTape() {
@@ -166,37 +245,28 @@ export class TuringRenderer {
         const isHeadPosition = visualPosition === 0;
         
         const material = new THREE.MeshStandardMaterial({
-            color: 0xff5e6c,
+            color: 0x000000, // Negro
             metalness: 0.2,
             roughness: 0.3,
-            emissive: 0xff5e6c,
-            emissiveIntensity: isHeadPosition ? 0.5 : 0.1
+            emissive: 0x333333, // Emisión gris oscura
+            emissiveIntensity: isHeadPosition ? 0.3 : 0.0
         });
         
-        // Dimensiones de la cápsula
-        const width = 0.8;
-        const height = 0.3;
+        // Dimensiones del cuadrado acostado
+        const width = 1.2;  // Ancho del cuadrado (aumentado)
+        const height = 1.2; // Alto del cuadrado (aumentado)
+        const depth = 0.15;  // Grosor (también aumentado proporcionalmente)
         
-        // Cuerpo central (cilindro horizontal)
-        const cylinderGeometry = new THREE.CylinderGeometry(height, height, width, 32);
-        const cylinder = new THREE.Mesh(cylinderGeometry, material);
-        cylinder.rotation.z = Math.PI / 2; // Rotar horizontalmente
-        group.add(cylinder);
-        
-        // Esfera izquierda
-        const sphereGeometry = new THREE.SphereGeometry(height, 32, 32);
-        const leftSphere = new THREE.Mesh(sphereGeometry, material);
-        leftSphere.position.x = -width / 2;
-        group.add(leftSphere);
-        
-        // Esfera derecha
-        const rightSphere = new THREE.Mesh(sphereGeometry, material);
-        rightSphere.position.x = width / 2;
-        group.add(rightSphere);
+        // Crear cuadrado acostado (BoxGeometry)
+        // width en X, depth en Y (grosor vertical), height en Z
+        const boxGeometry = new THREE.BoxGeometry(width, depth, height);
+        const box = new THREE.Mesh(boxGeometry, material);
+        // No necesita rotación adicional porque ya está acostado por defecto
+        group.add(box);
 
         // Texto del símbolo - visible desde arriba
         const textPlane = this.createTextSprite(symbol, isHeadPosition);
-        textPlane.position.y = height + 0.05; // Encima de la cápsula
+        textPlane.position.y = depth / 2 + 0.05; // Justo encima del cuadrado acostado
         group.add(textPlane);
 
         // Calcular posición en la pista ovalada usando la posición visual
