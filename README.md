@@ -1,3 +1,4 @@
+//esto se ve mejor en el formato de codigo, no se como arreglar las tablas para que se vean mejor 
 # Simulación digital de maquina de Turing: operaciones aritmeticas ( con el sistema unario)
 
 Este proyecto consiste en una implementación visual de una máquina de turing desarrollada con tecnologías web (Three.js y Vite).
