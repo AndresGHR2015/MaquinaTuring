@@ -24,19 +24,104 @@ export class TuringRenderer {
         
         this.scene.add(this.tapeGroup);
         this.createBelt(); // Crear la correa primero (para que quede debajo)
+        this.createFlatTape(); // Crear la cinta plana (sobre la correa, bajo las celdas)
         this.createTape();
         this.createHead();
+    }
+
+    /**
+     * Crea la cinta plana mitad blanca y mitad negra
+     */
+    createFlatTape() {
+        // Parámetros de la cinta
+        const straightLength = this.straightLength * 1.01;
+        const curveRadius = this.curveRadius * 0.96;
+        const tapeWidth = 0.1; // Ancho de la cinta
+        const tapeThickness = 1.5; // Grosor suficiente para cubrir el espacio de las celdas
+        const halfStraight = straightLength / 2;
+        const outerRadius = curveRadius + tapeWidth / 2;
+        const innerRadius = curveRadius - tapeWidth / 2;
+        
+        // Crear la forma completa del óvalo (será la misma para ambas mitades)
+        const shape = new THREE.Shape();
+        
+        // Comenzar en la parte superior izquierda
+        shape.moveTo(-halfStraight, outerRadius);
+        
+        // Línea superior (izquierda a derecha)
+        shape.lineTo(halfStraight, outerRadius);
+        
+        // Curva derecha exterior
+        shape.absarc(halfStraight, 0, outerRadius, Math.PI / 2, -Math.PI / 2, true);
+        
+        // Línea inferior (derecha a izquierda)
+        shape.lineTo(-halfStraight, -outerRadius);
+        
+        // Curva izquierda exterior
+        shape.absarc(-halfStraight, 0, outerRadius, -Math.PI / 2, Math.PI / 2, true);
+        
+        // Crear el agujero interior
+        const hole = new THREE.Path();
+        hole.moveTo(-halfStraight, innerRadius);
+        hole.lineTo(halfStraight, innerRadius);
+        hole.absarc(halfStraight, 0, innerRadius, Math.PI / 2, -Math.PI / 2, true);
+        hole.lineTo(-halfStraight, -innerRadius);
+        hole.absarc(-halfStraight, 0, innerRadius, -Math.PI / 2, Math.PI / 2, true);
+        
+        shape.holes.push(hole);
+        
+        // ===== MITAD BLANCA (Z positivo - mitad frontal) =====
+        const whiteExtrudeSettings = {
+            depth: tapeThickness / 2, // Solo la mitad del grosor
+            bevelEnabled: false
+        };
+        
+        const whiteGeometry = new THREE.ExtrudeGeometry(shape, whiteExtrudeSettings);
+        // Posicionar desde Z=0 hacia adelante
+        whiteGeometry.translate(0, 0, 0);
+        
+        const whiteMaterial = new THREE.MeshStandardMaterial({
+            color: 0x000000,
+            metalness: 0.1,
+            roughness: 0.8,
+            side: THREE.DoubleSide
+        });
+        
+        const whiteTape = new THREE.Mesh(whiteGeometry, whiteMaterial);
+        whiteTape.position.y = -0.05;
+        this.scene.add(whiteTape);
+        
+        // ===== MITAD NEGRA (Z negativo - mitad trasera) =====
+        const blackExtrudeSettings = {
+            depth: tapeThickness / 2, // Solo la mitad del grosor
+            bevelEnabled: false
+        };
+        
+        const blackGeometry = new THREE.ExtrudeGeometry(shape, blackExtrudeSettings);
+        // Posicionar desde Z=0 hacia atrás
+        blackGeometry.translate(0, 0, -tapeThickness / 2);
+        
+        const blackMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            metalness: 0.1,
+            roughness: 0.8,
+            side: THREE.DoubleSide
+        });
+        
+        const blackTape = new THREE.Mesh(blackGeometry, blackMaterial);
+        blackTape.position.y = -0.05;
+        this.scene.add(blackTape);
     }
 
     /**
      * Crea la correa que va debajo de la cinta
      */
     createBelt() {
-        // Parámetros ligeramente más pequeños que la pista
-        const straightLength = this.straightLength * 0.99;
-        const curveRadius = this.curveRadius * 0.95;
+        // Parámetros deben coincidir con la cinta plana para que queden alineados
+        const straightLength = this.straightLength * 0.98;
+        const curveRadius = this.curveRadius * 0.93; // Mismo que la cinta plana
         const halfStraight = straightLength / 2;
-        const tubeRadius = 0.3; // Radio del tubo (grosor de la correa)
+        const tubeRadius = 0.2; // Radio del tubo (grosor de la correa)
         
         // Crear la curva que define el camino de la correa
         const curve = new THREE.CurvePath();
@@ -99,8 +184,8 @@ export class TuringRenderer {
         
         const belt = new THREE.Mesh(geometry, material);
         
-        // Posicionar la correa ligeramente debajo de las celdas
-        belt.position.y = -0.1; // Debajo de las celdas, pero más cerca
+        // Posicionar la correa completamente debajo de la cinta plana
+        belt.position.y = -0.05; // Más abajo para que no sobresalga por encima de la cinta
         
         this.scene.add(belt);
     }
@@ -244,36 +329,99 @@ export class TuringRenderer {
         // La celda está iluminada si está en la posición visual 0 (debajo del cabezal)
         const isHeadPosition = visualPosition === 0;
         
-        const material = new THREE.MeshStandardMaterial({
-            color: 0x000000, // Negro
-            metalness: 0.2,
-            roughness: 0.3,
-            emissive: 0x333333, // Emisión gris oscura
-            emissiveIntensity: isHeadPosition ? 0.3 : 0.0
+        // Dimensiones
+        const cellWidth = 1.27;
+        const cellHeight = 1.5;
+        const frameThickness = 0.2; // Grosor del marco
+        const innerDepth = 0.8; // Profundidad de la cavidad
+        
+        // 1. MARCO EXTERIOR NARANJA (hueco)
+        const frameColor = 0xff8c42; // Naranja
+        const frameMaterial = new THREE.MeshStandardMaterial({
+            color: frameColor,
+            metalness: 0.3,
+            roughness: 0.6
         });
         
-        // Dimensiones del cuadrado acostado
-        const width = 1.2;  // Ancho del cuadrado (aumentado)
-        const height = 1.2; // Alto del cuadrado (aumentado)
-        const depth = 0.15;  // Grosor (también aumentado proporcionalmente)
+        // Grosores diferentes para hacer el hueco rectangular
+        const frameThicknessHorizontal = 0.15; // Grosor de barras superior/inferior (más delgadas)
+        const frameThicknessVertical = 0.3;    // Grosor de barras izquierda/derecha (más gruesas)
         
-        // Crear cuadrado acostado (BoxGeometry)
-        // width en X, depth en Y (grosor vertical), height en Z
-        const boxGeometry = new THREE.BoxGeometry(width, depth, height);
-        const box = new THREE.Mesh(boxGeometry, material);
-        // No necesita rotación adicional porque ya está acostado por defecto
-        group.add(box);
+        // Crear marco con 4 barras (arriba, abajo, izquierda, derecha)
+        // Barra superior (más delgada)
+        const topBar = new THREE.BoxGeometry(cellWidth, frameThickness, frameThicknessHorizontal);
+        const topMesh = new THREE.Mesh(topBar, frameMaterial);
+        topMesh.position.z = cellHeight / 2 - frameThicknessHorizontal / 2;
+        group.add(topMesh);
+        
+        // Barra inferior (más delgada)
+        const bottomBar = new THREE.BoxGeometry(cellWidth, frameThickness, frameThicknessHorizontal);
+        const bottomMesh = new THREE.Mesh(bottomBar, frameMaterial);
+        bottomMesh.position.z = -cellHeight / 2 + frameThicknessHorizontal / 2;
+        group.add(bottomMesh);
+        
+        // Barra izquierda (más gruesa)
+        const leftBar = new THREE.BoxGeometry(frameThicknessVertical, frameThickness, cellHeight - 2 * frameThicknessHorizontal);
+        const leftMesh = new THREE.Mesh(leftBar, frameMaterial);
+        leftMesh.position.x = -cellWidth / 2 + frameThicknessVertical / 2;
+        group.add(leftMesh);
+        
+        // Barra derecha (más gruesa)
+        const rightBar = new THREE.BoxGeometry(frameThicknessVertical, frameThickness, cellHeight - 2 * frameThicknessHorizontal);
+        const rightMesh = new THREE.Mesh(rightBar, frameMaterial);
+        rightMesh.position.x = cellWidth / 2 - frameThicknessVertical / 2;
+        group.add(rightMesh);
+        
+        // 2. PIEZA MÓVIL INTERIOR (lámina delgada que se mueve en Z)
+        const innerWidth = (cellWidth - 2 * frameThicknessVertical); // Ancho disponible
+        const innerHeight = (cellHeight - 2 * frameThicknessHorizontal - 0.1) / 6; // Alto disponible
+        const laminaThickness = 0.6; // Grosor de la lámina (muy delgada)
+        
+        // Determinar posición según el símbolo (la lámina siempre es naranja)
+        let zPosition;
+        switch(symbol) {
+            case '1':
+                zPosition = -0.3; // Atrás
+                break;
+            case '0':
+                zPosition = 0; // Centro
+                break;
+            case '_':
+                zPosition = 0.3; // Adelante
+                break;
+            default:
+                zPosition = 0;
+        }
+        
+        // La lámina siempre es del mismo color que el marco (naranja)
+        const innerMaterial = new THREE.MeshStandardMaterial({
+            color: frameColor, // Mismo color que el marco
+            metalness: 0.2,
+            roughness: 0.7
+        });
+        
+        // Lámina delgada (BoxGeometry: ancho en X, alto en Y, grosor en Z)
+        const innerGeometry = new THREE.BoxGeometry(innerWidth, innerHeight, laminaThickness);
+        const innerMesh = new THREE.Mesh(innerGeometry, innerMaterial);
+        innerMesh.position.x = 0; // Centrada en X
+        innerMesh.position.z = zPosition; // Varía en Z
+        innerMesh.userData.targetZ = zPosition; // Para animaciones futuras
+        innerMesh.userData.currentSymbol = symbol;
+        group.add(innerMesh);
+        
+        // Guardar referencia a la pieza móvil para animaciones
+        group.userData.innerMesh = innerMesh;
 
         // Texto del símbolo - visible desde arriba
         const textPlane = this.createTextSprite(symbol, isHeadPosition);
-        textPlane.position.y = depth / 2 + 0.05; // Justo encima del cuadrado acostado
+        textPlane.position.y = frameThickness / 2 + 0.15; // Encima del marco
         group.add(textPlane);
 
         // Calcular posición en la pista ovalada usando la posición visual
         const pos = this.getCellPosition(visualPosition, totalCells);
         
         group.position.x = pos.x;
-        group.position.y = pos.y;
+        group.position.y = pos.y - frameThickness / 2; // Bajar las celdas para que el fondo toque la correa
         group.position.z = 0;
         
         // Rotar la celda para que siga la tangente de la pista
@@ -313,22 +461,44 @@ export class TuringRenderer {
     }
 
     createHead() {
-        // Crear cabezal lector/escritor (más pequeño)
-        const geometry = new THREE.ConeGeometry(0.3, 1.0, 4);
-        const material = new THREE.MeshStandardMaterial({
-            color: 0xe74c3c,
+        // Grupo para el cabezal completo (cono + sensor infrarrojo)
+        this.headGroup = new THREE.Group();
+        
+        // Crear cabezal lector/escritor (cono rojo)
+        const coneGeometry = new THREE.ConeGeometry(0.3, 1.0, 4);
+        const coneMaterial = new THREE.MeshStandardMaterial({
+            color: 0xe74c3c, // Rojo
             metalness: 0.5,
             roughness: 0.3,
             emissive: 0xe74c3c,
             emissiveIntensity: 0.3
         });
-        this.headMesh = new THREE.Mesh(geometry, material);
-        this.headMesh.rotation.x = Math.PI; // Rotar 180 grados en X para que apunte hacia abajo
+        const coneMesh = new THREE.Mesh(coneGeometry, coneMaterial);
+        coneMesh.rotation.x = Math.PI; // Rotar 180 grados en X para que apunte hacia abajo
+        this.headGroup.add(coneMesh);
+        
+        // Crear haz infrarrojo (línea/cilindro delgado)
+        const beamLength = 0.8;
+        const beamGeometry = new THREE.CylinderGeometry(0.02, 0.04, beamLength, 8);
+        const beamMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff0000, // Rojo brillante
+            transparent: true,
+            opacity: 0.6,
+            emissive: 0xff0000,
+            emissiveIntensity: 1.0
+        });
+        const beamMesh = new THREE.Mesh(beamGeometry, beamMaterial);
+        beamMesh.position.y = -0.5 - beamLength / 2; // Debajo del cono
+        this.headGroup.add(beamMesh);
+        
+        // Guardar referencia al haz para posibles animaciones
+        this.headGroup.userData.infraredBeam = beamMesh;
         
         // Posicionar el cabezal
+        this.headMesh = this.headGroup; // Mantener compatibilidad con código existente
         this.updateHeadPosition();
         
-        this.scene.add(this.headMesh);
+        this.scene.add(this.headGroup);
     }
 
     updateHeadPosition() {
@@ -355,6 +525,32 @@ export class TuringRenderer {
         
         // Actualizar posición del cabezal (solo la primera vez)
         this.updateHeadPosition();
+        
+        // Animar piezas móviles de las celdas
+        this.animateMovingPieces();
+    }
+    
+    /**
+     * Anima suavemente las piezas móviles de las celdas hacia su posición objetivo
+     */
+    animateMovingPieces() {
+        if (!this.tapeGroup) return;
+        
+        const lerpSpeed = 0.15; // Velocidad de interpolación (0-1, mayor = más rápido)
+        
+        this.tapeGroup.children.forEach(cellGroup => {
+            if (!cellGroup.userData.innerMesh) return;
+            
+            const innerMesh = cellGroup.userData.innerMesh;
+            const targetZ = innerMesh.userData.targetZ;
+            
+            // Interpolación suave (lerp) hacia la posición objetivo en Z
+            if (Math.abs(innerMesh.position.z - targetZ) > 0.001) {
+                innerMesh.position.z += (targetZ - innerMesh.position.z) * lerpSpeed;
+            } else {
+                innerMesh.position.z = targetZ; // Snap final para evitar oscilaciones
+            }
+        });
     }
 
     updateMachine(newTuringMachine) {
