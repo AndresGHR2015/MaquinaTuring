@@ -1,128 +1,89 @@
-# Simulador de Máquina de Turing 3D - Calculadora Binaria
+# Simulación digital de maquina de Turing: operaciones aritmeticas ( con el sistema unario)
 
-Visualización interactiva de una Máquina de Turing con **módulos intercambiables** (SUMA y RESTA) usando Three.js y Vite.
+Este proyecto consiste en una implementación visual de una máquina de turing desarrollada con tecnologías web (Three.js y Vite).
+El software simula la lógica de autómatas finitos para realizar operaciones de suma y resta utilizando el sistema numérico unario.
 
-## 🎯 Características
+## Descripción del proyecto
 
-- 🎮 **Visualización 3D** de la cinta y cabezal de la máquina
-- 🔧 **2 Módulos Intercambiables**:
-  - ➕ **SUMA**: Suma de números binarios
-  - ➖ **RESTA**: Resta de números binarios
-- ⚡ Ejecución paso a paso o automática
-- 🎨 Interfaz moderna y responsive
-- 🔄 Controles intuitivos (Iniciar, Pausar, Reiniciar, Paso a Paso)
-- 📊 Información en tiempo real del estado de la máquina
-- 🎬 Animación de cambio de módulo (simula cambio físico del cabezal)
+objetivo principal es demostrar la ejecución de algoritmos aritméticos
+*El sistema cuenta con una arquitectura modular que permite realizar dos operaciones:
 
-## 📦 Instalación
+1.  **Módulo de Suma:** Adición de una unidad .
+2.  **Módulo de Resta:** Sustracción de una unidad .
 
-```bash
-npm install
-```
+## Requisitos para ejecución:
 
-## 🚀 Desarrollo
+* **Node.js** (Versión 14.0.0 o superior).
+* **NPM** (Gestor de paquetes de Node).
 
-```bash
-npm run dev
-```
+## como instalar y desplegar:
 
-El servidor de desarrollo se abrirá en `http://localhost:3000`
+1.  **Instalar dependencias:**
+    ```bash
+    npm install
+    ```
 
-## 🏗️ Build
+2.  **Ejecutar servidor de desarrollo:**
+    ```bash
+    npm run dev
+    ```
 
-```bash
-npm run build
-```
+3.  **Abrir en navegador:**
+    Acceda a la URL indicada (usualmente `http://localhost:3000`).
 
-## 🎮 Uso
+## Manual de Uso paso a paso:
 
-### Módulo SUMA (Operación Unaria: +1)
-- **Entrada**: Un número binario seguido de `_`
-- **Ejemplo**: `101_` (5 + 1 = 6 en decimal = 110 en binario)
-- **Resultado**: La máquina incrementa el número en 1
+### 1. Selección del Módulo
+Seleccione la operación deseada en el panel superior:
+* **SUMA:** Agrega un símbolo a la cadena.
+* **RESTA:** Elimina el último símbolo de la cadena.
 
-### Módulo RESTA (Operación Unaria: -1)
-- **Entrada**: Un número binario seguido de `_`
-- **Ejemplo**: `101_` (5 - 1 = 4 en decimal = 100 en binario)
-- **Resultado**: La máquina decrementa el número en 1
+### 2. Entrada de Datos (Sistema Unario)
+La máquina opera con cadenas de unos.
+* **Ejemplo:** Para representar el número **3**, ingrese `111`. Para el **5**, ingrese `11111`.
+* Ingrese la cadena en el campo de texto y presione **"Cargar Cinta"**.
 
-### Cambiar entre módulos
-1. Haz clic en **➕ SUMA** o **➖ RESTA**
-2. El cabezal cambiará de color (verde para suma, rojo para resta)
-3. La cinta se reiniciará con un ejemplo: `101_`
-4. Ambos módulos usan el mismo formato de entrada, pero realizan operaciones diferentes
+### 3. Interpretación de Salida
+* Observe el movimiento del cabezal 3D.
+* Al finalizar (estado `qFIN`), cuente la cantidad de símbolos `1` restantes en la cinta para obtener el resultado decimal.
 
-## 🎓 Tablas de Transición
+---------------------------------------------------
 
-### SUMA (Ejemplo: 5 + 1)
-| Estado | Lee | Escribe | Nuevo Estado | Mover |
-|--------|-----|---------|--------------|-------|
-| q0     | 1   | 1       | q0           | R     |
-| q0     | 0   | 1       | q1           | R     |
-| q0     | _   | _       | qFIN         | S     |
-| q1     | 1   | 1       | q1           | R     |
-| q1     | _   | _       | q2           | L     |
-| q2     | 1   | _       | qFIN         | S     |
+## Documentación Técnica: Tablas de Estados
 
-### RESTA
-| Estado | Lee | Escribe | Nuevo Estado | Mover |
-|--------|-----|---------|--------------|-------|
-| q0     | 1   | 1       | q0           | R     |
-| q0     | 0   | 0       | q0           | R     |
-| q0     | _   | _       | q1           | L     |
-| q1     | 1   | _       | q2           | L     |
-| q1     | 0   | _       | qFIN         | S     |
-| q1     | _   | _       | q3           | L     |
-| q2     | 1   | 1       | q2           | L     |
-| q2     | 0   | 0       | q2           | L     |
-| q2     | _   | _       | q3           | R     |
-| q3     | 1   | _       | q0           | R     |
+Las operaciones se realizan en **Sistema Unario**, simplificando la lógica de transición al evitar acarreos binarios.
 
-## 📁 Estructura del Proyecto
+**Convenciones:**
+* **R:** Mover a la derecha (Right).
+* **L:** Mover a la izquierda (Left).
+* **S:** Mantener posición (Stay).
+* **_:** Símbolo vacío (Blank).
 
-```
-MaquinaTuring/
-├── src/
-│   ├── main.js           # Punto de entrada y configuración de Three.js
-│   ├── TuringMachine.js  # Lógica de los autómatas (SUMA y RESTA)
-│   └── TuringRenderer.js # Renderizado 3D de la máquina
-├── index.html            # HTML principal con controles
-├── style.css             # Estilos
-├── vite.config.js        # Configuración de Vite
-└── package.json          # Dependencias
-```
+### Módulo SUMA :
+el algoritmo recorre la cinta hasta encontrar el primer espacio vacío y deposita un '1'.
 
-## 🔧 Personalización
+| Estado | Símbolo Leído | Escribe | Nuevo Estado | Movimiento |
+| q0     | 1             | 1       | q0           | R          |
+| q0     | _             | 1       | qFIN         | S          |
 
-### Modificar la cinta inicial
+### Módulo RESTA :
+el algoritmo avanza hasta el final de la cadena, retrocede una posición y borra el ultimo símbolo.
 
-Edita en `src/main.js` el método `changeModule()`:
+| Estado | Símbolo Leído | Escribe | Nuevo Estado | Movimiento |
+| q0     | 1             | 1       | q0           | R          |
+| q0     | _             | _       | q1           | L          |
+| q1     | 1             | _       | qFIN         | S          |
 
-```javascript
-if (moduleName === 'SUMA') {
-    newTape = ['1', '1', '1', '_', '_', '_', '_']; // 7 + 1 = 8
-}
-```
 
-### Ajustar velocidad de ejecución
 
-Modifica en `src/main.js`:
+## como se organiza el codigo:
 
-```javascript
-this.animationSpeed = 500; // milisegundos por paso (más bajo = más rápido)
-```
-
-## 🎓 Concepto
-
-Este proyecto simula una **Máquina de Turing con módulos intercambiables**, replicando el concepto de una máquina análoga donde se puede cambiar físicamente el cabezal lector/escritor para realizar diferentes operaciones. El cambio de módulo incluye una animación visual que representa este intercambio físico.
-
-Las operaciones son **unarias**:
-- **SUMA**: Incrementa el número binario en 1
-- **RESTA**: Decrementa el número binario en 1
-
-## 🛠️ Tecnologías
-
-- **Three.js** - Librería 3D para WebGL
-- **Vite** - Build tool y dev server ultrarrápido
-- **JavaScript ES6+** - Lenguaje moderno
-- **CSS3** - Estilos y animaciones
+MaquinaTuring
+--src
+│   |--main.js            #clase principal.
+|   |--TuringMachine.js   #logica unaria y reglas de transición.
+│   |--TuringRenderer.js  #motor gráfico Three.js
+|-- index.html            #interfaz de usuario
+|-- vite.config.js        #configuración del proyecto.
+|--HARDWARE.md            #hardware y diseño inicial del proyecto
+|--DIARO_PROYECTO.md      #diario de avances del proyecto.
