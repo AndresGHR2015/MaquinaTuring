@@ -27,11 +27,264 @@ export class TuringRenderer {
         this.createFlatTape(); // Crear la cinta plana (sobre la correa, bajo las celdas)
         this.createRollers(); // Crear los rodillos en los extremos
         this.createChassis(); // Crear el soporte físico
+        this.createWriterArm(); // Crear el brazo escritor
+        this.createHeadSupport(); // Crear el soporte del cabezal
         this.createTape();
         this.createHead();
     }
 
-/**
+    /**
+     * Crea el puente fijo que sostiene el cabezal sobre la cinta (Versión Segura)
+     */
+    /**
+     * Crea el puente fijo (Sin varillas colgantes)
+     */
+    /**
+     * Crea el puente fijo (Pilares corregidos para tocar la base)
+     */
+    createHeadSupport() {
+        const supportGroup = new THREE.Group();
+        
+        // Materiales
+        const woodMaterial = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.9, metalness: 0.1 });
+        
+        // --- CONFIGURACIÓN DE ALTURA ---
+        let headY = 2.0;
+        if (this.headMesh && this.headMesh.position) {
+            headY = this.headMesh.position.y;
+        }
+
+        // CAMBIO: Subimos la viga mucho más (antes era +5.0)
+        const beamY = headY + 6.5; 
+
+        // Cálculo del suelo (igual que antes)
+        const baseHeight = 1.5; 
+        const baseYCenter = -this.curveRadius - 3; 
+        const floorY = baseYCenter + (baseHeight / 2); 
+        
+        // Dimensiones
+        const bridgeSpan = 9.0;
+        const pillarThick = 1.2;
+        
+        // 1. VIGA TRANSVERSAL
+        const beamGeo = new THREE.BoxGeometry(1.5, 1.0, bridgeSpan + 2);
+        const beam = new THREE.Mesh(beamGeo, woodMaterial);
+        beam.position.set(0, beamY, 0); 
+        supportGroup.add(beam);
+
+        // 2. PILARES VERTICALES (Se estiran automáticamente)
+        const pillarHeight = beamY - floorY; 
+        const pillarGeo = new THREE.BoxGeometry(pillarThick, pillarHeight, pillarThick);
+        const pillarYPos = floorY + (pillarHeight / 2);
+
+        // Pilar Frontal
+        const frontPillar = new THREE.Mesh(pillarGeo, woodMaterial);
+        frontPillar.position.set(0, pillarYPos, bridgeSpan / 2);
+        supportGroup.add(frontPillar);
+
+        // Pilar Trasero
+        const backPillar = new THREE.Mesh(pillarGeo, woodMaterial);
+        backPillar.position.set(0, pillarYPos, -bridgeSpan / 2);
+        supportGroup.add(backPillar);
+
+        this.scene.add(supportGroup);
+    }
+
+    /**
+     * Versión "Mecánica": Añadido un actuador en la punta que parece un dedo retráctil.
+     * Se guarda una referencia 'this.writerFinger' para animaciones.
+     */
+    /**
+     * Versión "Articulada": El brazo principal se divide en dos con un pivote (codo).
+     * Mantiene el mecanismo de dedo retráctil y la alineación automática.
+     */
+    /**
+     * Versión Final: Brazo Articulado + Dedo Retráctil por defecto.
+     * El dedo inicia en posición RETRAÍDA (no toca la cinta).
+     */
+    createWriterArm() {
+        this.writerGroup = new THREE.Group();
+
+        // --- 1. POSICIONES ---
+        const touchY = this.curveRadius + 0.6; 
+        const targetPos = new THREE.Vector3(0, touchY, 0);
+        const pivotY = touchY + 1.2; 
+        const pivotZ = 3.4; // Posición ajustada para no chocar con el pilar
+        const pivotPos = new THREE.Vector3(0, pivotY, pivotZ);
+
+        const directionVector = new THREE.Vector3().subVectors(targetPos, pivotPos);
+        const totalDistance = directionVector.length(); 
+
+        // --- 2. MATERIALES ---
+        const bluePlasticMat = new THREE.MeshPhysicalMaterial({ color: 0x0044ff, metalness: 0.1, roughness: 0.2, transmission: 0.6, opacity: 0.9, transparent: true });
+        const whiteNylonMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+        const stickerMat = new THREE.MeshBasicMaterial({ color: 0xdaa520 }); 
+        const mountBlack = new THREE.MeshStandardMaterial({ color: 0x111111 });
+        const actuatorGreyMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.7, roughness: 0.3 });
+        const fingerTipMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.2, roughness: 0.4 });
+
+
+        // --- 3. MOTOR ESTÁTICO (Sin cambios) ---
+        const servoStaticGroup = new THREE.Group();
+        servoStaticGroup.position.copy(pivotPos);
+        servoStaticGroup.rotation.y = Math.PI; 
+        this.writerGroup.add(servoStaticGroup);
+
+        const sW = 1.2; const sH = 1.3; const sD = 0.6;
+        const body = new THREE.Mesh(new THREE.BoxGeometry(sW, sH, sD), bluePlasticMat);
+        body.position.set(0, -sH/2 - 0.2, 0); servoStaticGroup.add(body);
+        const topPart = new THREE.Mesh(new THREE.BoxGeometry(sW, 0.4, sD), bluePlasticMat);
+        topPart.position.set(0, -0.1, 0); servoStaticGroup.add(topPart);
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.2, 16), whiteNylonMat);
+        shaft.rotation.x = Math.PI / 2; shaft.position.z = sD/2; servoStaticGroup.add(shaft);
+        const tabs = new THREE.Mesh(new THREE.BoxGeometry(sW + 0.8, 0.1, sD), bluePlasticMat);
+        tabs.position.set(0, -0.5, 0); servoStaticGroup.add(tabs);
+        const sticker = new THREE.Mesh(new THREE.PlaneGeometry(sW - 0.2, sH/2), stickerMat);
+        sticker.rotation.y = Math.PI; sticker.position.set(0, -sH/2 - 0.2, -sD/2 - 0.01); servoStaticGroup.add(sticker);
+        const mountBlock = new THREE.Mesh(new THREE.BoxGeometry(sW, sH, 0.2), mountBlack);
+        mountBlock.position.set(0, -sH/2 - 0.2, -sD/2 - 0.1); servoStaticGroup.add(mountBlock);
+
+
+        // --- 4. BRAZO DINÁMICO ARTICULADO ---
+        const armPivotGroup = new THREE.Group();
+        armPivotGroup.position.copy(pivotPos);
+        armPivotGroup.position.z -= 0.1; 
+        this.writerGroup.add(armPivotGroup);
+        armPivotGroup.lookAt(targetPos);
+
+        // --- CÁLCULOS ---
+        const actuatorLen = 0.5; 
+        const fingerTipLen = 0.4;
+        const mainArmLen = totalDistance - (actuatorLen * 0.5) - fingerTipLen;
+        
+        // División del brazo (Codo)
+        const upperArmLen = mainArmLen * 0.4; 
+        const foreArmLen = mainArmLen * 0.6;  
+        const armWidth = 0.25; const armThickness = 0.1;
+
+        // A) Brazo Superior
+        const upperArmGeo = new THREE.BoxGeometry(armWidth, armThickness, upperArmLen);
+        upperArmGeo.translate(0, 0, upperArmLen / 2); 
+        const upperArm = new THREE.Mesh(upperArmGeo, whiteNylonMat);
+        armPivotGroup.add(upperArm);
+        const screw = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.15, 16), new THREE.MeshStandardMaterial({color:0x333333}));
+        screw.rotation.x = Math.PI/2; armPivotGroup.add(screw);
+
+        // B) Codo
+        const elbowSphere = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), whiteNylonMat);
+        elbowSphere.position.z = upperArmLen; 
+        armPivotGroup.add(elbowSphere);
+        const elbowBolt = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.3, 16), new THREE.MeshStandardMaterial({color:0x333333}));
+        elbowBolt.rotation.x = Math.PI/2; elbowBolt.position.z = upperArmLen; armPivotGroup.add(elbowBolt);
+
+        // C) Antebrazo
+        const foreArmGroup = new THREE.Group();
+        foreArmGroup.position.z = upperArmLen;
+        this.foreArmGroup = foreArmGroup; // Guardar referencia para animaciones
+        armPivotGroup.add(foreArmGroup);
+        const foreArmGeo = new THREE.BoxGeometry(armWidth, armThickness, foreArmLen);
+        foreArmGeo.translate(0, 0, foreArmLen / 2); 
+        const foreArm = new THREE.Mesh(foreArmGeo, whiteNylonMat);
+        foreArmGroup.add(foreArm);
+
+        // D) Carcasa Actuador
+        const actuatorGeo = new THREE.CylinderGeometry(0.18, 0.18, actuatorLen, 16);
+        actuatorGeo.rotateX(Math.PI / 2); 
+        const actuatorHousing = new THREE.Mesh(actuatorGeo, actuatorGreyMat);
+        actuatorHousing.position.z = foreArmLen + (actuatorLen / 2);
+        foreArmGroup.add(actuatorHousing);
+
+
+        // --- CONFIGURACIÓN DEL DEDO RETRÁCTIL ---
+        
+        // 1. Calcular las posiciones límite
+        // Posición extendida (tocando cinta) = final del antebrazo + longitud actuador
+        const extendedZ = foreArmLen + actuatorLen;
+        // Posición retraída (escondido) = un poco más atrás
+        const retractedZ = extendedZ - 0.3;
+
+        // Guardar en la instancia para usar en animaciones
+        this.fingerExtendedZ = extendedZ;
+        this.fingerRetractedZ = retractedZ;
+
+        // 2. Crear el grupo del dedo
+        this.fingerGroup = new THREE.Group();
+        
+        // CAMBIO PRINCIPAL: INICIAR EN POSICIÓN RETRAÍDA
+        this.fingerGroup.position.z = retractedZ; 
+        
+        foreArmGroup.add(this.fingerGroup);
+
+        // 3. Geometría del pistón
+        const fingerGeo = new THREE.CylinderGeometry(0.08, 0.08, fingerTipLen, 16);
+        fingerGeo.rotateX(Math.PI / 2); 
+        fingerGeo.translate(0, 0, -fingerTipLen / 2); // Ajuste de origen
+        const fingerPiston = new THREE.Mesh(fingerGeo, fingerTipMat);
+        this.fingerGroup.add(fingerPiston);
+
+        const fingerTipSphere = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 8), fingerTipMat);
+        fingerTipSphere.position.z = 0; 
+        this.fingerGroup.add(fingerTipSphere);
+
+        this.writerFinger = this.fingerGroup; 
+
+
+        // --- 5. CABLEADO ---
+        const cableStart = new THREE.Vector3(0, pivotPos.y - 1.0, pivotPos.z + 0.5);
+        const arduinoX = (-this.straightLength / 2) - 4; 
+        const arduinoY = (-this.curveRadius - 3) + 2.0; 
+        const arduinoZ = 1.5; 
+        const cableEnd = new THREE.Vector3(arduinoX, arduinoY, arduinoZ);
+        const midPointMod = new THREE.Vector3(0, -8, 2); 
+
+        if (this.createWire.length > 3 || arguments.length > 2) {
+             this.createWire(this.writerGroup, cableStart, cableEnd, midPointMod);
+        } else {
+             this.createWire(this.writerGroup, cableStart, cableEnd);
+        }
+
+        this.scene.add(this.writerGroup);
+    }
+
+    /**
+     * NUEVO MÉTODO: Anima el dedo para que toque la cinta y se retraiga.
+     * Llámalo cuando la máquina escriba un símbolo.
+     */
+    animateWriteTap() {
+        if (!this.writerFinger || this.isAnimatingFinger) return;
+
+        this.isAnimatingFinger = true;
+        const speed = 0.05; // Velocidad del movimiento
+
+        // 1. Función para retraer (subir)
+        const retract = () => {
+            if (this.writerFinger.position.z > this.fingerRetractedZ) {
+                this.writerFinger.position.z -= speed;
+                requestAnimationFrame(retract);
+            } else {
+                this.writerFinger.position.z = this.fingerRetractedZ;
+                this.isAnimatingFinger = false; // Fin de la animación
+            }
+        };
+
+        // 2. Función para extender (bajar/tocar)
+        const extend = () => {
+            if (this.writerFinger.position.z < this.fingerExtendedZ) {
+                this.writerFinger.position.z += speed * 2; // Bajar más rápido (golpe)
+                requestAnimationFrame(extend);
+            } else {
+                this.writerFinger.position.z = this.fingerExtendedZ;
+                // Una vez que toca, empezar a retraer
+                setTimeout(retract, 100); // Esperar 100ms abajo antes de subir
+            }
+        };
+
+        // Iniciar secuencia: primero asegurar que está retraído, luego golpea
+        this.writerFinger.position.z = this.fingerRetractedZ;
+        extend();
+    }
+
+    /**
      * Crea el soporte físico: Base, Ejes y DOBLE Servo (Dual Drive)
      */
     createChassis() {
@@ -793,15 +1046,27 @@ export class TuringRenderer {
         // Grupo para el cabezal completo (doble sensor)
         this.headGroup = new THREE.Group();
         
-        // ===== CUERPO PRINCIPAL DEL CABEZAL =====
-        const bodyGeometry = new THREE.BoxGeometry(0.8, 0.4, 1.2);
+        // ===== CUERPO PRINCIPAL DEL CABEZAL (AGRANDADO) =====
+        // ANTES: new THREE.BoxGeometry(0.8, 0.4, 1.2);
+        // AHORA: Más ancho (2.2), más alto (0.7) y más profundo (1.8) para tapar el hueco
+        const bodyWidth = 0.7;
+        const bodyHeight = 2.2;
+        const bodyDepth = 1.8;
+        
+        const bodyGeometry = new THREE.BoxGeometry(bodyWidth, bodyHeight, bodyDepth);
         const bodyMaterial = new THREE.MeshStandardMaterial({
             color: 0x2c3e50, // Gris azulado
             metalness: 0.6,
             roughness: 0.3
         });
         const bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        // Lo subimos ligeramente para que su centro siga estando cerca de la posición de lectura
+        bodyMesh.position.y = 0.9; 
         this.headGroup.add(bodyMesh);
+        
+        // Guarda la altura media del techo del cabezal para usarla en los soportes
+        // Posición Y del mesh + mitad de su altura
+        this.headTopYOffset = 0.15 + (bodyHeight / 2);
         
         // ===== SENSOR INFERIOR (INFRARROJO DE COLOR) =====
         // Ahora el IR va en el lado opuesto (frontal, z = +0.5)
@@ -1118,5 +1383,90 @@ export class TuringRenderer {
     animateStep() {
         // Animación suave cuando se mueve el cabezal (opcional)
         // Se puede implementar con GSAP o tweening manual
+    }
+
+    /**
+     * CORREGIDO: La profundidad del golpe se ajusta al símbolo.
+     * Para escribir '1', el dedo sale más para alcanzar el fondo.
+     */
+    animateWriteOperation(symbol, onWriteMoment, onComplete) {
+        if (this.isAnimating || !this.writerFinger) return;
+        this.isAnimating = true;
+
+        const duration = 400; // ms
+        const startTime = performance.now();
+
+        // 1. ESTADOS INICIALES
+        const startFingerZ = this.fingerRetractedZ;
+        const startElbowRot = 0;
+        
+        // --- CÁLCULO DE PROFUNDIDAD DINÁMICA ---
+        // Dependiendo del símbolo que vamos a escribir, el dedo necesita salir más o menos.
+        // '1' = Placa abajo del todo -> El dedo tiene que entrar profundo.
+        // '0' = Placa al medio -> Profundidad media.
+        // '_' = Placa arriba -> El dedo solo toca la superficie.
+        
+        let depthOffset = 0;
+        switch(symbol) {
+            case '1':
+                // Empujar profundo (ajusta este 0.5 si es mucho o poco)
+                depthOffset = 0.5; 
+                break;
+            case '0':
+                // Empujar medio
+                depthOffset = 0.25;
+                break;
+            case '_':
+            default:
+                // Tocar superficie (un pequeño empujón para asegurar contacto visual)
+                depthOffset = 0.05;
+                break;
+        }
+
+        // La posición objetivo final es la base extendida + el offset calculado
+        const targetFingerZ = this.fingerExtendedZ + depthOffset;
+        // Un poco más de flexión de codo si el golpe es profundo
+        const targetElbowRot = THREE.MathUtils.degToRad(15 + (depthOffset * 10)); 
+        
+        // Referencias
+        const finger = this.writerFinger;
+        const elbow = this.foreArmGroup;
+        let hasWritten = false;
+
+        const animateFrame = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            let progress = elapsed / duration;
+            if (progress >= 1) progress = 1;
+
+            // Curva de ida y vuelta (sinusoidal)
+            const movementCurve = Math.sin(progress * Math.PI); 
+
+            // A. ANIMACIÓN DEL DEDO (Pistón)
+            const currentFingerZ = startFingerZ + (targetFingerZ - startFingerZ) * movementCurve;
+            finger.position.z = currentFingerZ;
+
+            // B. ANIMACIÓN DEL CODO
+            const currentElbowRot = startElbowRot + (targetElbowRot - startElbowRot) * movementCurve;
+            if (elbow) elbow.rotation.x = currentElbowRot;
+
+            // --- MOMENTO DE ESCRITURA (Al 50%) ---
+            if (progress > 0.5 && !hasWritten) {
+                if (onWriteMoment) onWriteMoment(symbol);
+                hasWritten = true;
+            }
+
+            // --- FINALIZAR ---
+            if (progress < 1) {
+                requestAnimationFrame(animateFrame);
+            } else {
+                // Restaurar posiciones exactas
+                finger.position.z = this.fingerRetractedZ;
+                if (elbow) elbow.rotation.x = 0;
+                this.isAnimating = false;
+                if (onComplete) onComplete();
+            }
+        };
+
+        requestAnimationFrame(animateFrame);
     }
 }

@@ -113,49 +113,54 @@ export class TuringMachine {
         return this.tape[this.headPosition] || '_';
     }
 
-    step() {
+    step(sensedSymbol) {
         if (this.isHalted()) {
-            return false;
+            return { status: 'HALTED' };
         }
 
-        // Usar únicamente el símbolo recibido por el sensor
-        const currentSymbol = arguments[0];
+        // 1. Usar el símbolo que le pasamos desde el SENSOR (Visual)
+        // Si no se pasa nada, usa la memoria interna (fallback)
+        const currentSymbol = sensedSymbol !== undefined ? sensedSymbol : (this.tape[this.headPosition] || '_');
+        
         const key = `${this.currentState},${currentSymbol}`;
         const transition = this.transitions[key];
 
         if (!transition) {
             console.warn(`No hay transición definida para ${key}`);
             this.currentState = this.haltState;
-            return false;
+            return { status: 'HALTED', error: 'No transition' };
         }
 
         const [newState, newSymbol, direction] = transition;
 
-        // Escribir nuevo símbolo
-        this.tape[this.headPosition] = newSymbol;
+        // Detectar si hubo cambio de símbolo (para saber si animar el brazo)
+        const symbolChanged = currentSymbol !== newSymbol;
 
-        // Cambiar estado
+        // 2. Actualizar memoria interna
+        this.tape[this.headPosition] = newSymbol;
         this.currentState = newState;
 
-        // Mover cabezal
+        // 3. Mover cabezal (Lógica interna)
         if (direction === 'R') {
             this.headPosition++;
-            // Expandir cinta si es necesario
-            if (this.headPosition >= this.tape.length) {
-                this.tape.push('_');
-            }
+            if (this.headPosition >= this.tape.length) this.tape.push('_');
         } else if (direction === 'L') {
             this.headPosition--;
-            // Expandir cinta a la izquierda si es necesario
             if (this.headPosition < 0) {
                 this.tape.unshift('_');
                 this.headPosition = 0;
             }
         }
-        // 'N' = no moverse
 
         this.stepCount++;
-        return true;
+
+        // 4. RETORNAR INFORMACIÓN PARA LA ANIMACIÓN
+        return {
+            status: 'RUNNING',
+            action: symbolChanged ? 'WRITE_AND_MOVE' : 'MOVE_ONLY', // Clave para tu animación
+            newSymbol: newSymbol,      // Qué símbolo escribir (para el dedo)
+            direction: direction       // Hacia dónde mover la cinta después
+        };
     }
 
     isHalted() {

@@ -18,14 +18,14 @@ class App {
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x1a1a2e);
 
-        // Cámara - vista cenital (desde arriba) para ver los símbolos
+        // Cámara
         this.camera = new THREE.PerspectiveCamera(
             60,
             this.container.clientWidth / this.container.clientHeight,
             0.1,
             1000
         );
-        this.camera.position.set(0, 8, 25); // Vista desde el frente
+        this.camera.position.set(0, 8, 25);
         this.camera.lookAt(0, 0, 0);
 
         // Renderer
@@ -34,7 +34,7 @@ class App {
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.container.appendChild(this.renderer.domElement);
 
-        // Controles de órbita
+        // Controles
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
@@ -47,37 +47,33 @@ class App {
         directionalLight.position.set(5, 10, 5);
         this.scene.add(directionalLight);
 
-        // Grid helper - más grande para la cinta de 64 celdas
+        // Grid
         const gridHelper = new THREE.GridHelper(100, 100, 0x444444, 0x222222);
         this.scene.add(gridHelper);
 
-        // Redimensionamiento
         window.addEventListener('resize', () => this.onWindowResize());
     }
 
     initTuringMachine() {
-        // Inicializar máquina de Turing con una cinta de 64 celdas vacías
         const initialTape = Array(64).fill('_');
         this.turingMachine = new TuringMachine(initialTape, 'SUMA');
-        // Renderizador visual de la máquina
         this.turingRenderer = new TuringRenderer(this.scene, this.turingMachine);
     }
 
     initControls() {
         this.isRunning = false;
-        this.animationSpeed = 500; // milisegundos por paso
+        this.isProcessingStep = false; // Flag para evitar solapamiento de animaciones
+        this.animationSpeed = 100; // Tiempo de espera ENTRE pasos (no incluye la duración de la animación)
         
-        // Botones de control
+        // Botones
         this.startBtn = document.getElementById('startBtn');
         this.pauseBtn = document.getElementById('pauseBtn');
         this.resetBtn = document.getElementById('resetBtn');
         this.stepBtn = document.getElementById('stepBtn');
         
-        // Botones de módulo
         this.moduleSumaBtn = document.getElementById('moduleSumaBtn');
         this.moduleRestaBtn = document.getElementById('moduleRestaBtn');
         
-        // Input de cinta
         this.tapeInput = document.getElementById('tapeInput');
         this.loadTapeBtn = document.getElementById('loadTapeBtn');
         
@@ -89,8 +85,7 @@ class App {
         this.tapeVisualization = document.getElementById('tapeVisualization');
         this.resultOutput = document.getElementById('resultOutput');
         
-    // Valor por defecto del input
-    this.tapeInput.value = '';
+        this.tapeInput.value = '';
     }
 
     setupEventListeners() {
@@ -99,21 +94,14 @@ class App {
         this.resetBtn.addEventListener('click', () => this.reset());
         this.stepBtn.addEventListener('click', () => this.step());
         
-        // Eventos para cambiar de módulo
         this.moduleSumaBtn.addEventListener('click', () => this.changeModule('SUMA'));
         this.moduleRestaBtn.addEventListener('click', () => this.changeModule('RESTA'));
         
-        // Evento para cargar cinta personalizada
         this.loadTapeBtn.addEventListener('click', () => this.loadCustomTape());
-        
-        // Enter en el input también carga la cinta
         this.tapeInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.loadCustomTape();
-            }
+            if (e.key === 'Enter') this.loadCustomTape();
         });
         
-        // Validar que solo se ingresen 0s y 1s
         this.tapeInput.addEventListener('input', (e) => {
             e.target.value = e.target.value.replace(/[^01]/g, '');
         });
@@ -132,126 +120,150 @@ class App {
 
     reset() {
         this.isRunning = false;
+        this.isProcessingStep = false;
         this.turingMachine.reset();
-        // Forzar recreación de la cinta en reset
+        
         if (this.turingRenderer) {
             this.turingRenderer.update(true);
         }
+        
         this.resultOutput.textContent = 'Esperando...';
         this.resultOutput.style.background = 'rgba(255, 255, 255, 0.2)';
         this.updateDisplay();
     }
 
+    // --- LÓGICA PRINCIPAL DEL PASO ---
     step() {
-        if (!this.turingMachine.isHalted()) {
-            // Leer el símbolo detectado por el sensor
-            const sensorData = this.turingRenderer.readSensors();
-            // Pasar el símbolo detectado al método step de la máquina de Turing
-            this.turingMachine.step(sensorData.symbol);
-            // Forzar recreación de la cinta solo cuando cambia el estado
-            if (this.turingRenderer) {
-                this.turingRenderer.update(true);
-            }
-            this.updateDisplay();
-        } else {
-            // Si ya está detenida, mostrar mensaje
+        // 1. Validaciones previas
+        if (this.turingMachine.isHalted()) {
             console.log('✅ Máquina detenida. Resultado:', this.resultOutput.textContent);
+            this.isRunning = false; // Detener auto-run si termina
+            return;
+        }
+
+        // Si ya estamos animando un paso, no hacer nada (evita bugs visuales)
+        if (this.isProcessingStep) return;
+        this.isProcessingStep = true;
+
+        // 2. Leer Sensores (Raycasting 3D)
+        const sensorData = this.turingRenderer.readSensors();
+        
+        // 3. Ejecutar Lógica (Obtenemos qué hacer, pero la memoria interna ya cambió)
+        const result = this.turingMachine.step(sensorData.symbol);
+
+        if (result.status === 'HALTED') {
+            this.isProcessingStep = false;
+            this.updateDisplay();
+            return;
+        }
+
+        // Función auxiliar para finalizar el paso y preparar el siguiente
+        const finalizeStep = () => {
+            this.updateDisplay();
+            this.isProcessingStep = false;
+
+            // Si estamos en modo automático, programar el siguiente paso
+            if (this.isRunning) {
+                setTimeout(() => this.run(), this.animationSpeed);
+            }
+        };
+
+        // 4. Coordinar Animaciones
+        if (result.action === 'WRITE_AND_MOVE') {
+            // CASO A: Escribir y luego mover
+            
+            // Llamamos a la animación del brazo
+            this.turingRenderer.animateWriteOperation(
+                result.newSymbol,
+                
+                // Callback 1: ¡MOMENTO DEL GOLPE!
+                (symbol) => {
+                    // Aquí actualizamos la cinta 3D. Como this.turingMachine.tape ya tiene
+                    // el nuevo dato, update(true) recreará la cinta con el símbolo nuevo.
+                    // Visualmente parecerá que el dedo lo cambió.
+                    this.turingRenderer.update(true);
+                },
+
+                // Callback 2: Animación terminada (brazo retraído)
+                () => {
+                    finalizeStep();
+                }
+            );
+
+        } else {
+            // CASO B: Solo mover (sin escritura o mismo símbolo)
+            
+            // Actualizamos la cinta inmediatamente (el renderer detectará el movimiento del cabezal y hará scroll)
+            this.turingRenderer.update(true);
+            
+            // Pequeña pausa para que se vea el movimiento antes del siguiente
+            setTimeout(finalizeStep, 100);
         }
     }
 
     run() {
-        if (this.isRunning && !this.turingMachine.isHalted()) {
+        // Solo llamamos a step(). step() se encargará de volver a llamar a run()
+        // cuando termine la animación actual, creando un bucle asíncrono seguro.
+        if (this.isRunning) {
             this.step();
-            setTimeout(() => this.run(), this.animationSpeed);
-        } else {
-            this.isRunning = false;
         }
     }
 
     updateDisplay() {
-    this.currentModuleDisplay.textContent = this.turingMachine.getModuleName();
-    this.currentStateDisplay.textContent = this.turingMachine.currentState;
-    // Mostrar '_' si la cinta está vacía
-    const symbol = this.turingMachine.tape[this.turingMachine.headPosition] || '_';
-    this.currentSymbolDisplay.textContent = symbol;
-    this.stepCountDisplay.textContent = this.turingMachine.stepCount;
+        this.currentModuleDisplay.textContent = this.turingMachine.getModuleName();
+        this.currentStateDisplay.textContent = this.turingMachine.currentState;
+        const symbol = this.turingMachine.tape[this.turingMachine.headPosition] || '_';
+        this.currentSymbolDisplay.textContent = symbol;
+        this.stepCountDisplay.textContent = this.turingMachine.stepCount;
         
-        // Actualizar visualización de cinta
         this.updateTapeVisualization();
         
-        // Actualizar resultado si la máquina se detuvo
         if (this.turingMachine.isHalted()) {
             this.updateResult();
         }
     }
 
     updateTapeVisualization() {
-        // Obtener la cinta completa
+        // (Lógica de visualización HTML - Sin cambios)
         let tape = [...this.turingMachine.tape];
-
-        // Eliminar todos los guiones bajos al inicio y al final (visualización inicial limpia)
         let firstNonBlank = 0;
         let lastNonBlank = tape.length - 1;
+        
         for (let i = 0; i < tape.length; i++) {
-            if (tape[i] !== '_') {
-                firstNonBlank = i;
-                break;
-            }
+            if (tape[i] !== '_') { firstNonBlank = i; break; }
         }
         for (let i = tape.length - 1; i >= 0; i--) {
-            if (tape[i] !== '_') {
-                lastNonBlank = i;
-                break;
-            }
+            if (tape[i] !== '_') { lastNonBlank = i; break; }
         }
-        // Solo mostrar los símbolos relevantes
+        
         let visibleTape = tape.slice(firstNonBlank, lastNonBlank + 1).filter(s => s !== '_');
+        if (visibleTape.length === 0) visibleTape = ['_'];
 
-        // Si quedó vacía, mostrar al menos un guión bajo
-        if (visibleTape.length === 0) {
-            visibleTape = ['_'];
-        }
-
-        // Ajustar la posición del cabezal para la visualización
         let headPos = this.turingMachine.headPosition - firstNonBlank;
-        // Si el símbolo actual es '_' y fue eliminado, no mostrar el cabezal
-        if (headPos < 0 || headPos >= visibleTape.length) {
-            headPos = -1;
-        }
+        if (headPos < 0 || headPos >= visibleTape.length) headPos = -1;
 
-        // Crear visualización con el cabezal marcado
         let visualization = '';
         for (let i = 0; i < visibleTape.length; i++) {
             if (i === headPos) {
-                visualization += `<span style=\"color: #e74c3c; font-size: 22px;\">[${visibleTape[i]}]</span>`;
+                visualization += `<span style="color: #e74c3c; font-size: 22px;">[${visibleTape[i]}]</span>`;
             } else {
                 visualization += visibleTape[i];
             }
-
-            if (i < visibleTape.length - 1) {
-                visualization += ' ';
-            }
+            if (i < visibleTape.length - 1) visualization += ' ';
         }
-
         this.tapeVisualization.innerHTML = visualization;
     }
 
     updateResult() {
-        // Extraer el resultado de la cinta (sin guiones bajos al inicio ni al final)
+        // (Lógica de resultado - Sin cambios)
         let tape = [...this.turingMachine.tape];
         let firstNonBlank = 0;
         let lastNonBlank = tape.length - 1;
         for (let i = 0; i < tape.length; i++) {
-            if (tape[i] !== '_') {
-                firstNonBlank = i;
-                break;
-            }
+            if (tape[i] !== '_') { firstNonBlank = i; break; }
         }
         for (let i = tape.length - 1; i >= 0; i--) {
-            if (tape[i] !== '_') {
-                lastNonBlank = i;
-                break;
-            }
+            if (tape[i] !== '_') { lastNonBlank = i; break; }
         }
         const result = tape.slice(firstNonBlank, lastNonBlank + 1).filter(symbol => symbol !== '_').join('');
 
@@ -259,7 +271,6 @@ class App {
             this.resultOutput.textContent = '0';
             this.resultOutput.style.background = 'rgba(255, 255, 255, 0.2)';
         } else {
-            // Convertir unario a decimal: contar los '1'
             const decimal = result.split('').filter(c => c === '1').length;
             this.resultOutput.textContent = `${result} (${decimal} en decimal)`;
             this.resultOutput.style.background = 'rgba(46, 204, 113, 0.3)';
@@ -267,55 +278,32 @@ class App {
     }
 
     loadCustomTape() {
-        // Pausar ejecución si está corriendo
         this.pause();
-        
-        // Obtener valor del input
         const inputValue = this.tapeInput.value.trim();
         
-        // Validar que no esté vacío
-        if (inputValue === '') {
-            alert('Por favor ingresa un número binario');
-            return;
-        }
+        if (inputValue === '') { alert('Por favor ingresa un número binario'); return; }
+        if (!/^[01]+$/.test(inputValue)) { alert('Solo se permiten números binarios (0 y 1)'); return; }
         
-        // Validar que solo contenga 0s y 1s
-        if (!/^[01]+$/.test(inputValue)) {
-            alert('Solo se permiten números binarios (0 y 1)');
-            return;
-        }
-        
-        // Crear la cinta con el input + 64 celdas totales
         const newTape = [...inputValue.split('')];
         const remainingCells = 64 - newTape.length;
-        for (let i = 0; i < remainingCells; i++) {
-            newTape.push('_');
-        }
+        for (let i = 0; i < remainingCells; i++) newTape.push('_');
         
-        // Obtener módulo actual
         const currentModule = this.turingMachine.currentModule;
         
-        // Reiniciar máquina con nueva cinta
         this.turingMachine = new TuringMachine(newTape, currentModule);
         this.turingRenderer.updateMachine(this.turingMachine);
         
-        // Resetear resultado
         this.resultOutput.textContent = 'Esperando...';
         this.resultOutput.style.background = 'rgba(255, 255, 255, 0.2)';
         
         this.updateDisplay();
-        
         console.log(`✅ Cinta cargada: ${inputValue}`);
     }
 
     changeModule(moduleName) {
-        // Pausar ejecución si está corriendo
         this.pause();
-        
-        // Cambiar módulo con efecto visual
         this.animateModuleChange(moduleName);
         
-        // Actualizar botones activos
         if (moduleName === 'SUMA') {
             this.moduleSumaBtn.classList.add('active');
             this.moduleRestaBtn.classList.remove('active');
@@ -324,40 +312,29 @@ class App {
             this.moduleSumaBtn.classList.remove('active');
         }
         
-        // Usar el valor del input si existe, sino usar valor por defecto
-    const inputValue = this.tapeInput.value.trim();
-    const tape = inputValue === '' ? Array(64).fill('_') : inputValue.split('');
-        const newTape = [...inputValue.split('')];
+        const inputValue = this.tapeInput.value.trim();
+        const newTape = inputValue === '' ? Array(64).fill('_') : [...inputValue.split('')];
         const remainingCells = 64 - newTape.length;
-        for (let i = 0; i < remainingCells; i++) {
-            newTape.push('_');
-        }
+        for (let i = 0; i < remainingCells; i++) newTape.push('_');
         
-        // Reiniciar máquina con nuevo módulo
         this.turingMachine = new TuringMachine(newTape, moduleName);
         this.turingRenderer.updateMachine(this.turingMachine);
         this.updateDisplay();
     }
 
     animateModuleChange(moduleName) {
-        // Animación simple del cabezal para simular cambio físico
         if (this.turingRenderer.headMesh) {
             const originalY = this.turingRenderer.headMesh.position.y;
-            
-            // Subir el cabezal
             this.turingRenderer.headMesh.position.y = originalY + 3;
             
-            // Cambiar color según módulo
             setTimeout(() => {
                 if (moduleName === 'SUMA') {
-                    this.turingRenderer.headMesh.material.color.setHex(0x2ecc71); // Verde
+                    this.turingRenderer.headMesh.material.color.setHex(0x2ecc71); 
                     this.turingRenderer.headMesh.material.emissive.setHex(0x2ecc71);
                 } else {
-                    this.turingRenderer.headMesh.material.color.setHex(0xe74c3c); // Rojo
+                    this.turingRenderer.headMesh.material.color.setHex(0xe74c3c); 
                     this.turingRenderer.headMesh.material.emissive.setHex(0xe74c3c);
                 }
-                
-                // Bajar el cabezal
                 this.turingRenderer.headMesh.position.y = originalY;
             }, 300);
         }
@@ -372,15 +349,11 @@ class App {
     animate() {
         requestAnimationFrame(() => this.animate());
         this.controls.update();
-        
-        // Actualizar el renderer de Turing (incluye lectura de sensores)
         if (this.turingRenderer) {
             this.turingRenderer.update();
         }
-        
         this.renderer.render(this.scene, this.camera);
     }
 }
 
-// Iniciar aplicación cuando el DOM esté listo
 new App();
