@@ -118,7 +118,8 @@ export class TuringMachine {
             return false;
         }
 
-        const currentSymbol = this.getCurrentSymbol();
+        // Usar únicamente el símbolo recibido por el sensor
+        const currentSymbol = arguments[0];
         const key = `${this.currentState},${currentSymbol}`;
         const transition = this.transitions[key];
 

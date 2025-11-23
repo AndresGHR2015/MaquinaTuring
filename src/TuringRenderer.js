@@ -223,20 +223,32 @@ export class TuringRenderer {
     }
 
     /**
-     * Detecta movimiento del cabezal y rota la cinta incrementalmente
-     */
-    detectAndRotateTape(totalCells) {
-        const currentHeadPos = this.turingMachine.headPosition;
-        
-        // Detectar si hubo movimiento
-        if (currentHeadPos !== this.previousHeadPosition) {
-            const movement = currentHeadPos - this.previousHeadPosition;
-            
-            // Calcular el ángulo de rotación por celda
-            const straightPerimeter = this.straightLength * 2;
-            const curvePerimeter = Math.PI * this.curveRadius * 2;
-            const totalPerimeter = straightPerimeter + curvePerimeter;
-            
+            // PRIMERO: verificar si hay lámina naranja (obstáculo)
+            const irObstacleTargets = [];
+            this.tapeGroup.children.forEach(cellGroup => {
+                if (cellGroup.userData.innerMesh) {
+                    irObstacleTargets.push(cellGroup.userData.innerMesh);
+                }
+            });
+            const irObstacleIntersects = this.irRaycaster.intersectObjects(irObstacleTargets, false);
+            // Bloquea si detecta cualquier lámina suficientemente cerca
+            const irDetectsObstacle = irObstacleIntersects.length > 0 && irObstacleIntersects[0].distance < 1.8;
+
+            // SOLO si NO hay lámina bloqueante, verificar la cinta negra
+            let irDetectsBlack = false;
+            if (!irDetectsObstacle) {
+                const irTargets = [];
+                this.scene.traverse((obj) => {
+                    if (obj.isMesh && obj.material) {
+                        // Buscar meshes con material negro (cinta negra)
+                        if (obj.material.color && obj.material.color.getHex() === 0x000000) {
+                            irTargets.push(obj);
+                        }
+                    }
+                });
+                const irIntersects = this.irRaycaster.intersectObjects(irTargets, false);
+                irDetectsBlack = irIntersects.length > 0 && irIntersects[0].distance < 1.8;
+            }
             // Ángulo que corresponde a una celda
             const anglePerCell = (2 * Math.PI) / totalCells;
             
@@ -286,7 +298,11 @@ export class TuringRenderer {
         const startOffset = this.straightLength / 2;
         
         // Distancia recorrida por esta celda
-        const distance = ((index / totalCells) * totalPerimeter + startOffset) % totalPerimeter;
+        // Usar módulo que maneje negativos correctamente
+        let distance = ((index / totalCells) * totalPerimeter + startOffset) % totalPerimeter;
+        if (distance < 0) {
+            distance += totalPerimeter;
+        }
         
         let x, y, angle;
         
@@ -461,41 +477,93 @@ export class TuringRenderer {
     }
 
     createHead() {
-        // Grupo para el cabezal completo (cono + sensor infrarrojo)
+        // Grupo para el cabezal completo (doble sensor)
         this.headGroup = new THREE.Group();
         
-        // Crear cabezal lector/escritor (cono rojo)
-        const coneGeometry = new THREE.ConeGeometry(0.3, 1.0, 4);
-        const coneMaterial = new THREE.MeshStandardMaterial({
-            color: 0xe74c3c, // Rojo
-            metalness: 0.5,
-            roughness: 0.3,
-            emissive: 0xe74c3c,
-            emissiveIntensity: 0.3
+        // ===== CUERPO PRINCIPAL DEL CABEZAL =====
+        const bodyGeometry = new THREE.BoxGeometry(0.8, 0.4, 1.2);
+        const bodyMaterial = new THREE.MeshStandardMaterial({
+            color: 0x2c3e50, // Gris azulado
+            metalness: 0.6,
+            roughness: 0.3
         });
-        const coneMesh = new THREE.Mesh(coneGeometry, coneMaterial);
-        coneMesh.rotation.x = Math.PI; // Rotar 180 grados en X para que apunte hacia abajo
-        this.headGroup.add(coneMesh);
+        const bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        this.headGroup.add(bodyMesh);
         
-        // Crear haz infrarrojo (línea/cilindro delgado)
-        const beamLength = 0.8;
-        const beamGeometry = new THREE.CylinderGeometry(0.02, 0.04, beamLength, 8);
-        const beamMaterial = new THREE.MeshBasicMaterial({
+        // ===== SENSOR INFERIOR (INFRARROJO DE COLOR) =====
+        // Ahora el IR va en el lado opuesto (frontal, z = +0.5)
+        const irSensorGeometry = new THREE.BoxGeometry(0.3, 0.15, 0.3);
+        const irSensorMaterial = new THREE.MeshStandardMaterial({
+            color: 0xe74c3c, // Rojo
+            metalness: 0.7,
+            roughness: 0.2,
+            emissive: 0xe74c3c,
+            emissiveIntensity: 0.4
+        });
+        const irSensor = new THREE.Mesh(irSensorGeometry, irSensorMaterial);
+        irSensor.position.y = -0.25; // Abajo del cuerpo
+        irSensor.position.z = 0.5; // Frontal
+        this.headGroup.add(irSensor);
+
+        // Haz infrarrojo (rojo, vertical hacia abajo)
+        const irBeamLength = 0.8;
+        const irBeamGeometry = new THREE.CylinderGeometry(0.02, 0.04, irBeamLength, 8);
+        const irBeamMaterial = new THREE.MeshBasicMaterial({
             color: 0xff0000, // Rojo brillante
             transparent: true,
             opacity: 0.6,
             emissive: 0xff0000,
             emissiveIntensity: 1.0
         });
-        const beamMesh = new THREE.Mesh(beamGeometry, beamMaterial);
-        beamMesh.position.y = -0.5 - beamLength / 2; // Debajo del cono
-        this.headGroup.add(beamMesh);
+        const irBeam = new THREE.Mesh(irBeamGeometry, irBeamMaterial);
+        irBeam.position.y = -0.25 - irBeamLength / 2;
+        irBeam.position.z = 0.5;
+        this.headGroup.add(irBeam);
+
+        // ===== SENSOR SUPERIOR (LÁSER DE DISTANCIA) =====
+        // Ahora el láser va en el lado trasero (z = -0.5)
+        const laserSensorGeometry = new THREE.BoxGeometry(0.3, 0.15, 0.3);
+        const laserSensorMaterial = new THREE.MeshStandardMaterial({
+            color: 0x3498db, // Azul
+            metalness: 0.7,
+            roughness: 0.2,
+            emissive: 0x3498db,
+            emissiveIntensity: 0.4
+        });
+        const laserSensor = new THREE.Mesh(laserSensorGeometry, laserSensorMaterial);
+        laserSensor.position.y = -0.25; // Abajo del cuerpo
+        laserSensor.position.z = -0.5; // Trasero
+        this.headGroup.add(laserSensor);
+
+        // Haz láser (azul, vertical hacia abajo)
+        const laserBeamLength = 0.8;
+        const laserBeamGeometry = new THREE.CylinderGeometry(0.02, 0.04, laserBeamLength, 8);
+        const laserBeamMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00ffff, // Cian brillante
+            transparent: true,
+            opacity: 0.7,
+            emissive: 0x00ffff,
+            emissiveIntensity: 1.0
+        });
+        const laserBeam = new THREE.Mesh(laserBeamGeometry, laserBeamMaterial);
+        laserBeam.position.y = -0.25 - laserBeamLength / 2;
+        laserBeam.position.z = -0.5;
+        this.headGroup.add(laserBeam);
         
-        // Guardar referencia al haz para posibles animaciones
-        this.headGroup.userData.infraredBeam = beamMesh;
+        // Guardar referencias para raycasting
+        this.headGroup.userData.laserBeam = laserBeam;
+        this.headGroup.userData.irBeam = irBeam;
+        this.headGroup.userData.laserSensor = laserSensor;
+        this.headGroup.userData.irSensor = irSensor;
+        
+        // Crear raycasters con distancia máxima configurada
+        this.laserRaycaster = new THREE.Raycaster();
+        this.laserRaycaster.far = 5.0; // Alcance de 5 unidades
+        this.irRaycaster = new THREE.Raycaster();
+        this.irRaycaster.far = 5.0; // Alcance de 5 unidades
         
         // Posicionar el cabezal
-        this.headMesh = this.headGroup; // Mantener compatibilidad con código existente
+        this.headMesh = this.headGroup;
         this.updateHeadPosition();
         
         this.scene.add(this.headGroup);
@@ -519,15 +587,187 @@ export class TuringRenderer {
         }
     }
 
-    update() {
-        // Actualizar visualización de la cinta
-        this.createTape();
+    /**
+     * Lee los sensores usando Raycaster y determina el símbolo
+     * Retorna: { symbol: '1'|'0'|'_', laserDetection: boolean, irDetection: boolean }
+     */
+  readSensors() {
+    if (!this.headGroup || !this.tapeGroup) {
+        return { symbol: '_', laserDetection: false, irDetection: false, error: 'Sensores no inicializados' };
+    }
+
+    // Obtener posición mundial del cabezal
+    const headWorldPos = new THREE.Vector3();
+    this.headGroup.getWorldPosition(headWorldPos);
+
+    // ==========================================
+    // 1. PREPARACIÓN DE OBJETIVOS (Optimización)
+    // ==========================================
+    
+    // Recopilamos las láminas móviles (innerMesh)
+    // Estas sirven como OBJETIVO para el Láser y como OBSTÁCULO para el IR
+    const movingSheets = [];
+    this.tapeGroup.children.forEach(cellGroup => {
+        if (cellGroup.userData.innerMesh) {
+            movingSheets.push(cellGroup.userData.innerMesh);
+        }
+    });
+
+    // ==========================================
+    // 2. SENSOR LÁSER (SUPERIOR - Distancia)
+    // ==========================================
+    const laserDirection = new THREE.Vector3(0, -1, 0);
+    const laserOrigin = new THREE.Vector3(
+        headWorldPos.x,
+        headWorldPos.y - 0.25,
+        headWorldPos.z - 0.5 // Lado Trasero
+    );
+    this.laserRaycaster.set(laserOrigin, laserDirection);
+
+    // El láser solo le interesa si choca con las láminas
+    const laserIntersects = this.laserRaycaster.intersectObjects(movingSheets, false);
+    const laserDetectsWall = laserIntersects.length > 0 && laserIntersects[0].distance < 3.0;
+
+
+    // ==========================================
+    // 3. SENSOR INFRARROJO (INFERIOR - Color)
+    // ==========================================
+    const irDirection = new THREE.Vector3(0, -1, 0);
+    const irOrigin = new THREE.Vector3(
+        headWorldPos.x,
+        headWorldPos.y - 0.25,
+        headWorldPos.z + 0.5 // Lado Frontal
+    );
+    this.irRaycaster.set(irOrigin, irDirection);
+
+    // --- INTEGRACIÓN DE LA LÓGICA ROBUSTA ---
+    
+    // A. Creamos una lista unificada de TODO lo que el IR puede ver físicamente:
+    //    1. Las láminas móviles (que actúan como obstáculos/tapones)
+    //    2. La cinta negra de fondo (lo que queremos leer)
+    const irAllPhysicalObjects = [...movingSheets]; // Copiamos las láminas primero
+
+    // Agregamos los fondos negros (usando tu lógica de traverse existente)
+    // NOTA: Si pudieras identificar los fondos negros sin traverse (ej. por nombre), sería más rápido.
+    this.scene.traverse((obj) => {
+        if (obj.isMesh && obj.material && obj.material.color && obj.material.color.getHex() === 0x000000) {
+            irAllPhysicalObjects.push(obj);
+        }
+    });
+
+    // B. Lanzamos UN SOLO rayo contra todo el mundo
+    const irIntersects = this.irRaycaster.intersectObjects(irAllPhysicalObjects, false);
+
+    // C. Lógica de "El Primer Impacto Manda"
+    let irDetectsBlack = false;
+
+    if (irIntersects.length > 0) {
+        const firstHit = irIntersects[0]; // El objeto más cercano al sensor
+        
+        // Verificamos que esté dentro del rango físico del sensor (1.8 unidades)
+        if (firstHit.distance < 1.8) {
+            // ¿Con qué chocó?
+            if (firstHit.object.material.color.getHex() === 0x000000) {
+                // Chocó con el fondo negro -> El camino estaba libre
+                irDetectsBlack = true;
+            } else {
+                // Chocó con una lámina (naranja/gris) -> El camino estaba obstruido
+                // Por lo tanto, NO ve negro.
+                irDetectsBlack = false; 
+            }
+        }
+    }
+
+    // ==========================================
+    // 4. LÓGICA DE INTERPRETACIÓN
+    // ==========================================
+    // Símbolo | Láser (Arriba) | IR (Abajo)    | Explicación Física
+    // 1       | SI (Pared)     | SI (Negro)    | Lámina arriba (tapa hueco IR) pero hueco abajo? *Revisar lógica*
+    // 0       | NO (Hueco)     | SI (Negro)    | Lámina al medio (deja ver negro abajo)
+    // _       | NO (Hueco)     | NO (Naranja)  | Lámina abajo (tapa lo negro)
+    
+    // *NOTA*: Asegúrate que esta tabla coincida con tu diseño 3D final.
+    // Basado en tu código anterior:
+    
+    let detectedSymbol;
+    if (laserDetectsWall && irDetectsBlack) {
+        detectedSymbol = '1';
+    } else if (!laserDetectsWall && irDetectsBlack) {
+        detectedSymbol = '0';
+    } else if (!laserDetectsWall && !irDetectsBlack) {
+        detectedSymbol = '_';
+    } else {
+        // Caso extraño: Láser detecta pared arriba, pero IR no detecta negro abajo.
+        // Significa que hay una lámina arriba Y una lámina abajo? (Físicamente imposible con una sola pieza)
+        detectedSymbol = '?'; 
+    }
+
+    // Debug info
+    const result = {
+        symbol: detectedSymbol,
+        laserDetection: laserDetectsWall,
+        irDetection: irDetectsBlack,
+        laserDistance: laserIntersects.length > 0 ? laserIntersects[0].distance.toFixed(2) : 'N/A',
+        irDistance: irIntersects.length > 0 ? irIntersects[0].distance.toFixed(2) : 'N/A',
+        irHitsObjType: irIntersects.length > 0 ? (irDetectsBlack ? "FONDO NEGRO" : "OBSTACULO") : "NADA"
+    };
+
+    return result;
+}
+
+    // ==========================================
+    // 4. LÓGICA DE INTERPRETACIÓN
+    // ==========================================
+    // Símbolo | Láser (Arriba) | IR (Abajo)    | Explicación Física
+    // 1       | SI (Pared)     | SI (Negro)    | Lámina arriba (tapa hueco IR) pero hueco abajo? *Revisar lógica*
+    // 0       | NO (Hueco)     | SI (Negro)    | Lámina al medio (deja ver negro abajo)
+    // _       | NO (Hueco)     | NO (Naranja)  | Lámina abajo (tapa lo negro)
+    
+    // *NOTA*: Asegúrate que esta tabla coincida con tu diseño 3D final.
+    // Basado en tu código anterior:
+
+    update(forceRecreate = false) {
+        // Solo recrear la cinta si es necesario (cuando cambia el estado de la máquina)
+        if (forceRecreate) {
+            this.createTape();
+        }
         
         // Actualizar posición del cabezal (solo la primera vez)
         this.updateHeadPosition();
         
         // Animar piezas móviles de las celdas
         this.animateMovingPieces();
+        
+        // Leer sensores y mostrar información (debug) - solo cada ciertos frames para optimizar
+        if (!this.sensorCheckCounter) this.sensorCheckCounter = 0;
+        this.sensorCheckCounter++;
+        
+        // Leer sensores cada 10 frames (no en cada frame)
+        if (this.sensorCheckCounter % 10 === 0 && this.headGroup && this.laserRaycaster) {
+            const sensorData = this.readSensors();
+            
+            // Actualizar colores de los haces según detección
+            if (this.headGroup.userData.laserBeam) {
+                this.headGroup.userData.laserBeam.material.opacity = sensorData.laserDetection ? 1.0 : 0.4;
+            }
+            if (this.headGroup.userData.irBeam) {
+                this.headGroup.userData.irBeam.material.opacity = sensorData.irDetection ? 0.9 : 0.3;
+            }
+            
+            // Log en consola (solo si cambió el símbolo detectado)
+            if (!this.lastDetectedSymbol || this.lastDetectedSymbol !== sensorData.symbol) {
+                console.log('🔍 SENSORES:', {
+                    'Símbolo Detectado': sensorData.symbol,
+                    'Láser (Pared)': sensorData.laserDetection ? '✅ DETECTA' : '❌ NO DETECTA',
+                    'IR (Negro)': sensorData.irDetection ? '✅ NEGRO' : '❌ BLANCO/NARANJA',
+                    'Distancia Láser': sensorData.laserDistance,
+                    'Distancia IR': sensorData.irDistance,
+                    '🎯 Láser Hits': sensorData.laserHits + '/' + sensorData.laserTargetsCount,
+                    '🎯 IR Hits': sensorData.irHits + '/' + sensorData.irTargetsCount
+                });
+                this.lastDetectedSymbol = sensorData.symbol;
+            }
+        }
     }
     
     /**

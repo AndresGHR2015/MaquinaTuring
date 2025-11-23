@@ -141,7 +141,10 @@ class App {
     reset() {
         this.isRunning = false;
         this.turingMachine.reset();
-        this.turingRenderer.update();
+        // Forzar recreación de la cinta en reset
+        if (this.turingRenderer) {
+            this.turingRenderer.update(true);
+        }
         this.resultOutput.textContent = 'Esperando...';
         this.resultOutput.style.background = 'rgba(255, 255, 255, 0.2)';
         this.updateDisplay();
@@ -149,8 +152,14 @@ class App {
 
     step() {
         if (!this.turingMachine.isHalted()) {
-            this.turingMachine.step();
-            this.turingRenderer.update();
+            // Leer el símbolo detectado por el sensor
+            const sensorData = this.turingRenderer.readSensors();
+            // Pasar el símbolo detectado al método step de la máquina de Turing
+            this.turingMachine.step(sensorData.symbol);
+            // Forzar recreación de la cinta solo cuando cambia el estado
+            if (this.turingRenderer) {
+                this.turingRenderer.update(true);
+            }
             this.updateDisplay();
         } else {
             // Si ya está detenida, mostrar mensaje
@@ -337,6 +346,12 @@ class App {
     animate() {
         requestAnimationFrame(() => this.animate());
         this.controls.update();
+        
+        // Actualizar el renderer de Turing (incluye lectura de sensores)
+        if (this.turingRenderer) {
+            this.turingRenderer.update();
+        }
+        
         this.renderer.render(this.scene, this.camera);
     }
 }
