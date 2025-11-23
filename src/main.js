@@ -56,17 +56,9 @@ class App {
     }
 
     initTuringMachine() {
-        // Inicializar máquina de Turing con una cinta de 64 celdas
-        // Formato: número binario seguido de espacios en blanco
-        // Ejemplo: 101 seguido de 61 guiones bajos
-        const initialTape = ['1', '0', '1'];
-        // Agregar 61 espacios en blanco para completar 64 celdas
-        for (let i = 0; i < 61; i++) {
-            initialTape.push('_');
-        }
-        
+        // Inicializar máquina de Turing con una cinta de 64 celdas vacías
+        const initialTape = Array(64).fill('_');
         this.turingMachine = new TuringMachine(initialTape, 'SUMA');
-        
         // Renderizador visual de la máquina
         this.turingRenderer = new TuringRenderer(this.scene, this.turingMachine);
     }
@@ -97,8 +89,8 @@ class App {
         this.tapeVisualization = document.getElementById('tapeVisualization');
         this.resultOutput = document.getElementById('resultOutput');
         
-        // Valor por defecto del input
-        this.tapeInput.value = '101';
+    // Valor por defecto del input
+    this.tapeInput.value = '';
     }
 
     setupEventListeners() {
@@ -177,10 +169,12 @@ class App {
     }
 
     updateDisplay() {
-        this.currentModuleDisplay.textContent = this.turingMachine.getModuleName();
-        this.currentStateDisplay.textContent = this.turingMachine.currentState;
-        this.currentSymbolDisplay.textContent = this.turingMachine.getCurrentSymbol();
-        this.stepCountDisplay.textContent = this.turingMachine.stepCount;
+    this.currentModuleDisplay.textContent = this.turingMachine.getModuleName();
+    this.currentStateDisplay.textContent = this.turingMachine.currentState;
+    // Mostrar '_' si la cinta está vacía
+    const symbol = this.turingMachine.tape[this.turingMachine.headPosition] || '_';
+    this.currentSymbolDisplay.textContent = symbol;
+    this.stepCountDisplay.textContent = this.turingMachine.stepCount;
         
         // Actualizar visualización de cinta
         this.updateTapeVisualization();
@@ -192,50 +186,81 @@ class App {
     }
 
     updateTapeVisualization() {
-        // Obtener la cinta completa sin espacios en blanco del final
+        // Obtener la cinta completa
         let tape = [...this.turingMachine.tape];
-        
-        // Eliminar guiones bajos del final
-        while (tape.length > 0 && tape[tape.length - 1] === '_') {
-            tape.pop();
+
+        // Eliminar todos los guiones bajos al inicio y al final (visualización inicial limpia)
+        let firstNonBlank = 0;
+        let lastNonBlank = tape.length - 1;
+        for (let i = 0; i < tape.length; i++) {
+            if (tape[i] !== '_') {
+                firstNonBlank = i;
+                break;
+            }
         }
-        
+        for (let i = tape.length - 1; i >= 0; i--) {
+            if (tape[i] !== '_') {
+                lastNonBlank = i;
+                break;
+            }
+        }
+        // Solo mostrar los símbolos relevantes
+        let visibleTape = tape.slice(firstNonBlank, lastNonBlank + 1).filter(s => s !== '_');
+
         // Si quedó vacía, mostrar al menos un guión bajo
-        if (tape.length === 0) {
-            tape = ['_'];
+        if (visibleTape.length === 0) {
+            visibleTape = ['_'];
         }
-        
+
+        // Ajustar la posición del cabezal para la visualización
+        let headPos = this.turingMachine.headPosition - firstNonBlank;
+        // Si el símbolo actual es '_' y fue eliminado, no mostrar el cabezal
+        if (headPos < 0 || headPos >= visibleTape.length) {
+            headPos = -1;
+        }
+
         // Crear visualización con el cabezal marcado
         let visualization = '';
-        for (let i = 0; i < tape.length; i++) {
-            if (i === this.turingMachine.headPosition) {
-                // Marcar posición del cabezal con corchetes y color
-                visualization += `<span style="color: #e74c3c; font-size: 22px;">[${tape[i]}]</span>`;
+        for (let i = 0; i < visibleTape.length; i++) {
+            if (i === headPos) {
+                visualization += `<span style=\"color: #e74c3c; font-size: 22px;\">[${visibleTape[i]}]</span>`;
             } else {
-                visualization += tape[i];
+                visualization += visibleTape[i];
             }
-            
-            // Agregar espacio entre símbolos
-            if (i < tape.length - 1) {
+
+            if (i < visibleTape.length - 1) {
                 visualization += ' ';
             }
         }
-        
+
         this.tapeVisualization.innerHTML = visualization;
     }
 
     updateResult() {
-        // Extraer el resultado de la cinta (sin espacios en blanco)
-        const result = this.turingMachine.tape
-            .filter(symbol => symbol !== '_')
-            .join('');
-        
+        // Extraer el resultado de la cinta (sin guiones bajos al inicio ni al final)
+        let tape = [...this.turingMachine.tape];
+        let firstNonBlank = 0;
+        let lastNonBlank = tape.length - 1;
+        for (let i = 0; i < tape.length; i++) {
+            if (tape[i] !== '_') {
+                firstNonBlank = i;
+                break;
+            }
+        }
+        for (let i = tape.length - 1; i >= 0; i--) {
+            if (tape[i] !== '_') {
+                lastNonBlank = i;
+                break;
+            }
+        }
+        const result = tape.slice(firstNonBlank, lastNonBlank + 1).filter(symbol => symbol !== '_').join('');
+
         if (result === '') {
             this.resultOutput.textContent = '0';
             this.resultOutput.style.background = 'rgba(255, 255, 255, 0.2)';
         } else {
-            // Convertir binario a decimal para mostrar
-            const decimal = parseInt(result, 2);
+            // Convertir unario a decimal: contar los '1'
+            const decimal = result.split('').filter(c => c === '1').length;
             this.resultOutput.textContent = `${result} (${decimal} en decimal)`;
             this.resultOutput.style.background = 'rgba(46, 204, 113, 0.3)';
         }
@@ -250,13 +275,13 @@ class App {
         
         // Validar que no esté vacío
         if (inputValue === '') {
-            alert('⚠️ Por favor ingresa un número binario');
+            alert('Por favor ingresa un número binario');
             return;
         }
         
         // Validar que solo contenga 0s y 1s
         if (!/^[01]+$/.test(inputValue)) {
-            alert('⚠️ Solo se permiten números binarios (0 y 1)');
+            alert('Solo se permiten números binarios (0 y 1)');
             return;
         }
         
@@ -300,7 +325,8 @@ class App {
         }
         
         // Usar el valor del input si existe, sino usar valor por defecto
-        const inputValue = this.tapeInput.value.trim() || '101';
+    const inputValue = this.tapeInput.value.trim();
+    const tape = inputValue === '' ? Array(64).fill('_') : inputValue.split('');
         const newTape = [...inputValue.split('')];
         const remainingCells = 64 - newTape.length;
         for (let i = 0; i < remainingCells; i++) {

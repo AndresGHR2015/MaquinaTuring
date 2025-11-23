@@ -4,63 +4,126 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Máquina de Turing - Simulador 3D</title>
-    <link rel="stylesheet" href="/style.css">
+    <!-- Fuentes (JetBrains Mono e Inter) -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- Enlace al archivo CSS externo -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="app">
-        <div id="controls">
-            <h1>Máquina de Turing - Calculadora Binaria</h1>
-            
+
+    <!-- Contenedor 3D (Fondo donde se renderiza Three.js) -->
+    <div id="canvas-container"></div>
+
+    <!-- Sidebar Principal (Menú Lateral) -->
+    <aside id="app-sidebar" class="active">
+        
+        <!-- Lengüeta (Tab) para abrir/cerrar -->
+        <button id="menuToggle" class="sidebar-tab" aria-label="Toggle menú">
+            <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+        </button>
+
+        <!-- Contenido del Menú -->
+        <div class="sidebar-content">
+            <h1>Calculadora Unaria <br><span style="font-size: 0.6em; color: var(--text-muted); font-weight: 400;">Máquina de Turing</span></h1>
+
             <!-- Selector de Módulo -->
+            <h3>Módulo de Operación</h3>
             <div class="module-selector">
-                <h3>Módulo Activo:</h3>
                 <div class="module-buttons">
-                    <button id="moduleSumaBtn" class="module-btn active">➕ SUMA</button>
-                    <button id="moduleRestaBtn" class="module-btn">➖ RESTA</button>
+                    <button id="moduleSumaBtn" class="module-btn active">SUMA (+)</button>
+                    <button id="moduleRestaBtn" class="module-btn">RESTA (-)</button>
                 </div>
-                <p class="module-info">Simula cambiar físicamente el cabezal de la máquina</p>
+                <p class="info-text">Simula el cambio físico del cabezal.</p>
             </div>
-            
+
             <!-- Input de Cinta -->
+            <h3>Configuración de Cinta</h3>
             <div class="tape-input-section">
-                <h3>Entrada de Cinta:</h3>
                 <div class="input-group">
-                    <input type="text" id="tapeInput" placeholder="Ej: 101" pattern="[01]+" maxlength="20">
-                    <button id="loadTapeBtn">📝 Cargar Cinta</button>
+                    <input type="text" id="tapeInput" placeholder="Ej: 101" pattern="[01]+" maxlength="20" autocomplete="off">
+                    <button id="loadTapeBtn">Cargar</button>
                 </div>
-                <p class="input-info">Ingresa un número binario (solo 0 y 1)</p>
+                <p class="info-text">Solo entrada unaria (1 como digitador y 0 como separador). e.g., 101 = 1 + 1 o 1 - 1 (depende del módulo activo)</p>
             </div>
-            
+
             <!-- Controles de Ejecución -->
+            <h3>Controles</h3>
             <div class="control-panel">
-                <button id="startBtn">▶️ Iniciar</button>
-                <button id="pauseBtn">⏸️ Pausar</button>
-                <button id="resetBtn">🔄 Reiniciar</button>
-                <button id="stepBtn">⏭️ Paso</button>
+                <button id="startBtn" title="Iniciar">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    <span>Run</span>
+                </button>
+                <button id="pauseBtn" title="Pausar">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                    <span>Pause</span>
+                </button>
+                <button id="stepBtn" title="Paso a Paso">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 18l2.29-2.29-4.88-4.88-4 4L2 7.41 3.41 6l6 6 4-4 6.3 6.29L22 12v6z"/></svg>
+                    <span>Step</span>
+                </button>
+                <button id="resetBtn" title="Reiniciar">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 10h7V3l-2.35 3.35z"/></svg>
+                    <span>Reset</span>
+                </button>
             </div>
-            
+
             <!-- Panel de Información -->
+            <h3>Estado del Sistema</h3>
             <div class="info-panel">
-                <div>Módulo: <span id="currentModule">SUMA</span></div>
-                <div>Estado: <span id="currentState">q0</span></div>
-                <div>Símbolo: <span id="currentSymbol">-</span></div>
-                <div>Pasos: <span id="stepCount">0</span></div>
+                <div class="info-item">
+                    <span class="info-label">Módulo</span>
+                    <span id="currentModule" class="info-value">SUMA</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Estado</span>
+                    <span id="currentState" class="info-value">q0</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Cabezal</span>
+                    <span id="currentSymbol" class="info-value">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Pasos</span>
+                    <span id="stepCount" class="info-value">0</span>
+                </div>
             </div>
-            
+
             <!-- Panel de Salida -->
+            <h3>Salida</h3>
             <div class="output-panel">
-                <h3>🔍 Visualización de Cinta:</h3>
                 <div class="tape-display">
-                    <div id="tapeVisualization" class="tape-content">-</div>
+                    <div id="tapeVisualization" class="tape-content">_</div>
                 </div>
                 <div class="result-section">
-                    <div class="result-label">Resultado:</div>
+                    <div class="result-label">Resultado Final</div>
                     <div id="resultOutput" class="result-value">Esperando...</div>
                 </div>
             </div>
         </div>
-        <div id="canvas-container"></div>
-    </div>
+    </aside>
+
+    <!-- Script de UI (Lógica visual del menú) -->
+    <script>
+        // Toggle del Sidebar
+        const toggleBtn = document.getElementById('menuToggle');
+        const sidebar = document.getElementById('app-sidebar');
+        
+        toggleBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
+        });
+
+        // Cambio visual de botones de módulo (Solo UI)
+        const modBtns = document.querySelectorAll('.module-btn');
+        modBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                modBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+    </script>
+
+    <!-- Tu script principal (Lógica de Turing y Three.js) -->
     <script type="module" src="/src/main.js"></script>
 </body>
 </html>
