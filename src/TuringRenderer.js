@@ -25,9 +25,93 @@ export class TuringRenderer {
         this.scene.add(this.tapeGroup);
         this.createBelt(); // Crear la correa primero (para que quede debajo)
         this.createFlatTape(); // Crear la cinta plana (sobre la correa, bajo las celdas)
+        this.createRollers(); // Crear los rodillos en los extremos
         this.createTape();
         this.createHead();
     }
+
+   createRollers() {
+    // ==========================================
+    // 🛠️ ZONA DE CONFIGURACIÓN (AJUSTA AQUÍ) 🛠️
+    // ==========================================
+    const config = {
+        radioPrincipal: 4.4,  // Grosor del cilindro gris (ajusta para llenar la curva)
+        anchoRodillo: 2.2,    // Largo del cilindro (debe ser igual o mayor al ancho de tu cinta)
+        radioTapa: 5,       // Tamaño de los yoyos azules (debe ser mayor al radioPrincipal)
+        grosorTapa: 0.2,      // Grosor de la tapa azul
+        colorGris: 0xaaaaaa,
+        colorAzul: 0x4444ff
+    };
+    // ==========================================
+
+    const rollersContainer = new THREE.Group();
+
+    // Materiales compartidos
+    const rollerMaterial = new THREE.MeshStandardMaterial({
+        color: config.colorGris, metalness: 0.5, roughness: 0.3
+    });
+    const soporteMaterial = new THREE.MeshStandardMaterial({
+        color: config.colorAzul, metalness: 0.6, roughness: 0.3
+    });
+
+    // Posiciones (asumiendo que straightLength viene de tu clase)
+    const xLeft = -this.straightLength / 2;
+    const xRight = this.straightLength / 2;
+    
+    // Función constructora del rodillo
+    const createFullRollerAssembly = () => {
+        const assembly = new THREE.Group();
+
+        // 1. Núcleo Gris
+        const coreGeo = new THREE.CylinderGeometry(
+            config.radioPrincipal, 
+            config.radioPrincipal, 
+            config.anchoRodillo, 
+            32
+        );
+        const coreMesh = new THREE.Mesh(coreGeo, rollerMaterial);
+        coreMesh.rotation.z = Math.PI / 2; 
+        assembly.add(coreMesh);
+
+        // 2. Tapas Azules
+        const capGeo = new THREE.CylinderGeometry(
+            config.radioTapa, 
+            config.radioTapa, 
+            config.grosorTapa, 
+            32
+        );
+        
+        // Tapa Izquierda
+        const leftCap = new THREE.Mesh(capGeo, soporteMaterial);
+        leftCap.rotation.z = Math.PI / 2;
+        leftCap.position.x = -(config.anchoRodillo / 2) - (config.grosorTapa / 2);
+        assembly.add(leftCap);
+
+        // Tapa Derecha
+        const rightCap = new THREE.Mesh(capGeo, soporteMaterial);
+        rightCap.rotation.z = Math.PI / 2;
+        rightCap.position.x = (config.anchoRodillo / 2) + (config.grosorTapa / 2);
+        assembly.add(rightCap);
+
+        return assembly;
+    };
+
+    // --- INSTANCIAR Y ROTAR ---
+
+    // Izquierdo
+    const leftRoller = createFullRollerAssembly();
+    leftRoller.rotation.y = Math.PI / 2; // Rotar 90 grados para mirar al frente
+    leftRoller.position.set(xLeft, 0, 0);
+    rollersContainer.add(leftRoller);
+
+    // Derecho
+    const rightRoller = createFullRollerAssembly();
+    rightRoller.rotation.y = Math.PI / 2; // Rotar 90 grados para mirar al frente
+    rightRoller.position.set(xRight, 0, 0);
+    rollersContainer.add(rightRoller);
+
+    this.scene.add(rollersContainer);
+}
 
     /**
      * Crea la cinta plana mitad blanca y mitad negra
