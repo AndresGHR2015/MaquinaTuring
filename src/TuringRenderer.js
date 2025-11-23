@@ -26,8 +26,237 @@ export class TuringRenderer {
         this.createBelt(); // Crear la correa primero (para que quede debajo)
         this.createFlatTape(); // Crear la cinta plana (sobre la correa, bajo las celdas)
         this.createRollers(); // Crear los rodillos en los extremos
+        this.createChassis(); // Crear el soporte físico
         this.createTape();
         this.createHead();
+    }
+
+/**
+     * Crea el soporte físico: Base, Ejes y DOBLE Servo (Dual Drive)
+     */
+    createChassis() {
+        const chassisGroup = new THREE.Group();
+
+        // Materiales
+        const woodMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x8b5a2b, 
+            roughness: 0.9, 
+            metalness: 0.1 
+        });
+        
+        const metalRodMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x888888, 
+            roughness: 0.4, 
+            metalness: 0.6 
+        });
+
+        // 1. LA BASE DE MADERA
+        const baseLength = this.straightLength + (this.curveRadius * 2) + 8;
+        const baseWidth = 10;
+        const baseHeight = 1.5;
+        const baseY = -this.curveRadius - 3;
+
+        const baseGeo = new THREE.BoxGeometry(baseLength, baseHeight, baseWidth);
+        const baseMesh = new THREE.Mesh(baseGeo, woodMaterial);
+        baseMesh.position.y = baseY;
+        chassisGroup.add(baseMesh);
+
+        // 2. SOPORTES, EJES Y SERVOS (Bucle para ambos lados)
+        const supportHeight = Math.abs(baseY) + 1;
+        const supportWidth = 1.5;
+        const supportDepth = 1.0;
+        
+        const positionsX = [-this.straightLength / 2, this.straightLength / 2];
+        const zFront = 3.5;
+        const zBack = -3.5; // Los servos irán aquí
+
+        // Posición del Arduino (para calcular los cables)
+        const arduinoPos = new THREE.Vector3(-this.straightLength / 2 - 5, baseY + 1, 0);
+
+        positionsX.forEach((posX) => {
+            // --- ESTRUCTURA ---
+            
+            // EJE (Varilla roscada)
+            const axleGeo = new THREE.CylinderGeometry(0.3, 0.3, 8.5, 16);
+            const axle = new THREE.Mesh(axleGeo, metalRodMaterial);
+            axle.rotation.x = Math.PI / 2;
+            axle.position.set(posX, 0, 0);
+            chassisGroup.add(axle);
+
+            // TORRE FRONTAL
+            const towerFront = new THREE.Mesh(new THREE.BoxGeometry(supportWidth, supportHeight, supportDepth), woodMaterial);
+            towerFront.position.set(posX, baseY + (supportHeight / 2), zFront);
+            chassisGroup.add(towerFront);
+
+            // TUERCA FRONTAL
+            this.addNut(chassisGroup, posX, 0, zFront + 0.6, metalRodMaterial);
+
+            // TORRE TRASERA
+            const towerBack = new THREE.Mesh(new THREE.BoxGeometry(supportWidth, supportHeight, supportDepth), woodMaterial);
+            towerBack.position.set(posX, baseY + (supportHeight / 2), zBack);
+            chassisGroup.add(towerBack);
+
+            // --- MOTORIZACIÓN (DUAL DRIVE) ---
+
+            // Colocamos un servo en la parte trasera de CADA rodillo
+            const servoZ = zBack - 1.5;
+            this.createDirectDriveServo(chassisGroup, posX, 0, servoZ);
+
+            // CABLEADO
+            // Creamos un cable desde cada servo hasta el Arduino común
+            // Ajustamos la curva del cable para que no atraviese la madera
+            const servoPos = new THREE.Vector3(posX, -2, servoZ);
+            
+            // Punto medio elevado para que el cable haga una curva bonita sobre la máquina
+            const midPointOffset = new THREE.Vector3(0, 4, 0); 
+            
+            this.createWire(chassisGroup, servoPos, arduinoPos, midPointOffset);
+        });
+
+        // 3. ARDUINO (El cerebro)
+        this.createArduinoBoard(chassisGroup, arduinoPos.x, baseY + baseHeight/2 + 0.1, arduinoPos.z);
+        
+        this.scene.add(chassisGroup);
+    }
+
+    /**
+     * Helper para tuercas
+     */
+    addNut(group, x, y, z, material) {
+        const nut = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.3, 6), material);
+        nut.rotation.x = Math.PI / 2;
+        nut.position.set(x, y, z);
+        group.add(nut);
+    }
+
+    /**
+     * Crea un cable con curva ajustable
+     */
+    createWire(group, start, end, midPointMod = new THREE.Vector3(0, -5, 0)) {
+        // Punto de control medio
+        const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+        mid.add(midPointMod); // Modificar la altura de la curva
+
+        const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+        const points = curve.getPoints(20);
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        
+        // Cables de diferentes colores para diferenciar (Rojo vs Negro o similar)
+        // Usamos un color aleatorio oscuro para variedad o fijo rojo
+        const material = new THREE.LineBasicMaterial({ color: 0xcc3333, linewidth: 2 }); 
+        
+        const wire = new THREE.Line(geometry, material);
+        group.add(wire);
+    }
+
+    /**
+     * Helper para tuercas
+     */
+    addNut(group, x, y, z, material) {
+        const nut = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.3, 6), material);
+        nut.rotation.x = Math.PI / 2;
+        nut.position.set(x, y, z);
+        group.add(nut);
+    }
+
+    /**
+     * Crea un Servo Motor estándar (tipo MG996R o Futaba) conectado al eje
+     */
+    createDirectDriveServo(group, x, y, z) {
+        const servoGroup = new THREE.Group();
+        servoGroup.position.set(x, y, z);
+
+        // Colores
+        const bodyColor = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.4 }); // Negro plástico
+        const labelColor = new THREE.MeshStandardMaterial({ color: 0xdddddd }); // Etiqueta
+        const hornColor = new THREE.MeshStandardMaterial({ color: 0xffffff }); // Horn blanco (típico)
+
+        // 1. Cuerpo principal del Servo (Caja rectangular)
+        // Dimensiones aprox de un servo estándar escalado
+        const bodyW = 4.0; // Ancho
+        const bodyH = 2.0; // Alto (visto de frente al eje)
+        const bodyD = 3.9; // Profundidad
+        
+        const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyD, bodyH), bodyColor);
+        // Rotamos para que quede vertical y perpendicular al eje
+        body.rotation.x = Math.PI / 2; 
+        // Ajustamos posición para que el eje de salida (que no está centrado en el servo) coincida con (0,0,0) local
+        body.position.set(0, -1.0, 0); 
+        servoGroup.add(body);
+
+        // 2. Orejas de montaje (Mounting tabs)
+        const tabsGeo = new THREE.BoxGeometry(bodyW + 1.5, 0.2, bodyH);
+        const tabs = new THREE.Mesh(tabsGeo, bodyColor);
+        tabs.rotation.x = Math.PI / 2;
+        tabs.position.set(0, -1.0, 0.5); // Un poco más abajo en Z local
+        servoGroup.add(tabs);
+
+        // 3. Eje de salida y "Horn" (La pieza que conecta al eje de la máquina)
+        // Un disco blanco que conecta el servo con la varilla roscada
+        const hornGeo = new THREE.CylinderGeometry(0.8, 0.8, 0.2, 32);
+        const horn = new THREE.Mesh(hornGeo, hornColor);
+        horn.rotation.x = Math.PI / 2;
+        horn.position.z = 1.0; // Lado que mira hacia la torre (Z positivo local)
+        servoGroup.add(horn);
+
+        // 4. Tornillo central del Horn
+        const screw = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.3, 16), new THREE.MeshStandardMaterial({color: 0x888888}));
+        screw.rotation.x = Math.PI / 2;
+        screw.position.z = 1.2;
+        servoGroup.add(screw);
+
+        // 5. Etiqueta (para que parezca real)
+        const label = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.5), labelColor);
+        label.position.set(0, 0, -1.01); // En la "espalda" del servo
+        label.rotation.y = Math.PI; // Mirando hacia atrás
+        servoGroup.add(label);
+
+        group.add(servoGroup);
+    }
+
+    /**
+     * Crea un cable simple (Curva Bezier cuadrática)
+     */
+    createWire(group, start, end) {
+        // Punto de control medio (para que el cable cuelgue un poco)
+        const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+        mid.y -= 2; // Cae por gravedad
+
+        const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+        const points = curve.getPoints(20);
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const material = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 2 }); // Cable rojo
+        
+        const wire = new THREE.Line(geometry, material);
+        group.add(wire);
+    }
+
+    // ... (Mantén el método createArduinoBoard del ejemplo anterior) ...
+    /**
+     * Genera una placa estilo Arduino UNO
+     */
+    createArduinoBoard(group, x, y, z) {
+        const boardGroup = new THREE.Group();
+        boardGroup.position.set(x, y, z);
+
+        // PCB Azul
+        const pcbMat = new THREE.MeshStandardMaterial({ color: 0x008CBA, roughness: 0.3 }); // Azul Teal
+        const pcb = new THREE.Mesh(new THREE.BoxGeometry(5, 0.1, 3.5), pcbMat);
+        boardGroup.add(pcb);
+
+        // Conector USB (Plata)
+        const usbMat = new THREE.MeshStandardMaterial({ color: 0xcccccc });
+        const usb = new THREE.Mesh(new THREE.BoxGeometry(1, 0.8, 0.8), usbMat);
+        usb.position.set(-2, 0.4, -0.5);
+        boardGroup.add(usb);
+
+        // Headers negros (donde van los cables)
+        const headerMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+        const header1 = new THREE.Mesh(new THREE.BoxGeometry(4, 0.6, 0.3), headerMat);
+        header1.position.set(0, 0.3, 1.5);
+        boardGroup.add(header1);
+
+        group.add(boardGroup);
     }
 
    createRollers() {
