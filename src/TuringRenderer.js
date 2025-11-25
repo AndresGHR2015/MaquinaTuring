@@ -1,6 +1,4 @@
 import * as THREE from 'three';
-import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
-import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 
 /**
  * Clase que renderiza visualmente la Máquina de Turing en 3D
@@ -13,32 +11,24 @@ export class TuringRenderer {
         this.headMesh = null;
         this.cellSize = 1.0;
         this.maxCells = 64;
-        this.headPositionSet = false; // Flag para establecer posición del cabezal solo una vez
-        this.previousHeadPosition = 0; // Para detectar movimientos
-        this.visualOffset = 0; // Offset visual para simular el movimiento de la cinta
-        
+        this.headPositionSet = false;
+        this.previousHeadPosition = 0; 
+        this.visualOffset = 0; 
         // Parámetros para el óvalo/pista (ajustados para 64 celdas juntas)
         // Con celdas de 0.8 de ancho, 64 celdas = 51.2 unidades de perímetro aproximado
-        this.straightLength = 25; // Longitud de los lados rectos
-        this.curveRadius = 5;     // Radio de las curvas en los extremos
+        this.straightLength = 25;
+        this.curveRadius = 5;    
         
         this.scene.add(this.tapeGroup);
-        this.createBelt(); // Crear la correa primero (para que quede debajo)
-        this.createFlatTape(); // Crear la cinta plana (sobre la correa, bajo las celdas)
-        this.createRollers(); // Crear los rodillos en los extremos
-        this.createChassis(); // Crear el soporte físico
-        this.createWriterArm(); // Crear el brazo escritor
-        this.createHeadSupport(); // Crear el soporte del cabezal
+        this.createBelt(); 
+        this.createFlatTape();
+        this.createChassis();
+        this.createWriterArm();
+        this.createHeadSupport(); 
         this.createTape();
         this.createHead();
     }
 
-    /**
-     * Crea el puente fijo que sostiene el cabezal sobre la cinta (Versión Segura)
-     */
-    /**
-     * Crea el puente fijo (Sin varillas colgantes)
-     */
     /**
      * Crea el puente fijo (Pilares corregidos para tocar la base)
      */
@@ -90,14 +80,6 @@ export class TuringRenderer {
         this.scene.add(supportGroup);
     }
 
-    /**
-     * Versión "Mecánica": Añadido un actuador en la punta que parece un dedo retráctil.
-     * Se guarda una referencia 'this.writerFinger' para animaciones.
-     */
-    /**
-     * Versión "Articulada": El brazo principal se divide en dos con un pivote (codo).
-     * Mantiene el mecanismo de dedo retráctil y la alineación automática.
-     */
     /**
      * Versión Final: Brazo Articulado + Dedo Retráctil por defecto.
      * El dedo inicia en posición RETRAÍDA (no toca la cinta).
@@ -350,14 +332,8 @@ export class TuringRenderer {
             chassisGroup.add(towerBack);
 
             // --- MOTORIZACIÓN (DUAL DRIVE) ---
-
-            // Colocamos un servo en la parte trasera de CADA rodillo
             const servoZ = zBack - 1.5;
             this.createDirectDriveServo(chassisGroup, posX, 0, servoZ);
-
-            // CABLEADO
-            // Creamos un cable desde cada servo hasta el Arduino común
-            // Ajustamos la curva del cable para que no atraviese la madera
             const servoPos = new THREE.Vector3(posX, -2, servoZ);
             
             // Punto medio elevado para que el cable haga una curva bonita sobre la máquina
@@ -513,9 +489,6 @@ export class TuringRenderer {
     }
 
    createRollers() {
-    // ==========================================
-    // 🛠️ ZONA DE CONFIGURACIÓN (AJUSTA AQUÍ) 🛠️
-    // ==========================================
     const config = {
         radioPrincipal: 4.4,  // Grosor del cilindro gris (ajusta para llenar la curva)
         anchoRodillo: 2.2,    // Largo del cilindro (debe ser igual o mayor al ancho de tu cinta)
@@ -524,7 +497,6 @@ export class TuringRenderer {
         colorGris: 0xaaaaaa,
         colorAzul: 0x4444ff
     };
-    // ==========================================
 
     const rollersContainer = new THREE.Group();
 
@@ -1177,10 +1149,6 @@ export class TuringRenderer {
     // Obtener posición mundial del cabezal
     const headWorldPos = new THREE.Vector3();
     this.headGroup.getWorldPosition(headWorldPos);
-
-    // ==========================================
-    // 1. PREPARACIÓN DE OBJETIVOS (Optimización)
-    // ==========================================
     
     // Recopilamos las láminas móviles (innerMesh)
     // Estas sirven como OBJETIVO para el Láser y como OBSTÁCULO para el IR
@@ -1191,9 +1159,6 @@ export class TuringRenderer {
         }
     });
 
-    // ==========================================
-    // 2. SENSOR LÁSER (SUPERIOR - Distancia)
-    // ==========================================
     const laserDirection = new THREE.Vector3(0, -1, 0);
     const laserOrigin = new THREE.Vector3(
         headWorldPos.x,
@@ -1206,10 +1171,6 @@ export class TuringRenderer {
     const laserIntersects = this.laserRaycaster.intersectObjects(movingSheets, false);
     const laserDetectsWall = laserIntersects.length > 0 && laserIntersects[0].distance < 3.0;
 
-
-    // ==========================================
-    // 3. SENSOR INFRARROJO (INFERIOR - Color)
-    // ==========================================
     const irDirection = new THREE.Vector3(0, -1, 0);
     const irOrigin = new THREE.Vector3(
         headWorldPos.x,
@@ -1218,15 +1179,7 @@ export class TuringRenderer {
     );
     this.irRaycaster.set(irOrigin, irDirection);
 
-    // --- INTEGRACIÓN DE LA LÓGICA ROBUSTA ---
-    
-    // A. Creamos una lista unificada de TODO lo que el IR puede ver físicamente:
-    //    1. Las láminas móviles (que actúan como obstáculos/tapones)
-    //    2. La cinta negra de fondo (lo que queremos leer)
-    const irAllPhysicalObjects = [...movingSheets]; // Copiamos las láminas primero
-
-    // Agregamos los fondos negros (usando tu lógica de traverse existente)
-    // NOTA: Si pudieras identificar los fondos negros sin traverse (ej. por nombre), sería más rápido.
+    const irAllPhysicalObjects = [...movingSheets]; 
     this.scene.traverse((obj) => {
         if (obj.isMesh && obj.material && obj.material.color && obj.material.color.getHex() === 0x000000) {
             irAllPhysicalObjects.push(obj);
@@ -1256,17 +1209,6 @@ export class TuringRenderer {
         }
     }
 
-    // ==========================================
-    // 4. LÓGICA DE INTERPRETACIÓN
-    // ==========================================
-    // Símbolo | Láser (Arriba) | IR (Abajo)    | Explicación Física
-    // 1       | SI (Pared)     | SI (Negro)    | Lámina arriba (tapa hueco IR) pero hueco abajo? *Revisar lógica*
-    // 0       | NO (Hueco)     | SI (Negro)    | Lámina al medio (deja ver negro abajo)
-    // _       | NO (Hueco)     | NO (Naranja)  | Lámina abajo (tapa lo negro)
-    
-    // *NOTA*: Asegúrate que esta tabla coincida con tu diseño 3D final.
-    // Basado en tu código anterior:
-    
     let detectedSymbol;
     if (laserDetectsWall && irDetectsBlack) {
         detectedSymbol = '1';
@@ -1276,7 +1218,6 @@ export class TuringRenderer {
         detectedSymbol = '_';
     } else {
         // Caso extraño: Láser detecta pared arriba, pero IR no detecta negro abajo.
-        // Significa que hay una lámina arriba Y una lámina abajo? (Físicamente imposible con una sola pieza)
         detectedSymbol = '?'; 
     }
 
@@ -1293,27 +1234,13 @@ export class TuringRenderer {
     return result;
 }
 
-    // ==========================================
-    // 4. LÓGICA DE INTERPRETACIÓN
-    // ==========================================
-    // Símbolo | Láser (Arriba) | IR (Abajo)    | Explicación Física
-    // 1       | SI (Pared)     | SI (Negro)    | Lámina arriba (tapa hueco IR) pero hueco abajo? *Revisar lógica*
-    // 0       | NO (Hueco)     | SI (Negro)    | Lámina al medio (deja ver negro abajo)
-    // _       | NO (Hueco)     | NO (Naranja)  | Lámina abajo (tapa lo negro)
-    
-    // *NOTA*: Asegúrate que esta tabla coincida con tu diseño 3D final.
-    // Basado en tu código anterior:
 
     update(forceRecreate = false) {
         // Solo recrear la cinta si es necesario (cuando cambia el estado de la máquina)
         if (forceRecreate) {
             this.createTape();
         }
-        
-        // Actualizar posición del cabezal (solo la primera vez)
         this.updateHeadPosition();
-        
-        // Animar piezas móviles de las celdas
         this.animateMovingPieces();
         
         // Leer sensores y mostrar información (debug) - solo cada ciertos frames para optimizar
@@ -1380,13 +1307,7 @@ export class TuringRenderer {
         this.createTape();
     }
 
-    animateStep() {
-        // Animación suave cuando se mueve el cabezal (opcional)
-        // Se puede implementar con GSAP o tweening manual
-    }
-
     /**
-     * CORREGIDO: La profundidad del golpe se ajusta al símbolo.
      * Para escribir '1', el dedo sale más para alcanzar el fondo.
      */
     animateWriteOperation(symbol, onWriteMoment, onComplete) {

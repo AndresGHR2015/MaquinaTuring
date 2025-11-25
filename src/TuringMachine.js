@@ -29,17 +29,7 @@ export class TuringMachine {
     }
 
     /**
-     * MÓDULO DE SUMA - Incrementa en 1 un número binario (operación unaria)
-     * Entrada: un número binario seguido de '_'
-     * Ejemplo 1: 101_ (5 + 1 = 6 en decimal = 110 en binario)
-     * 
-     * Tabla de transiciones:
-     * q0,1 -> q0,1,R
-     * q0,0 -> q1,1,R
-     * q0,_ -> qFIN,_,S
-     * q1,1 -> q1,1,R
-     * q1,_ -> q2,_,L
-     * q2,1 -> qFIN,_,S
+     * MÓDULO DE SUMA - (operación unaria)
      */
     moduloSuma() {
         return {
@@ -58,21 +48,7 @@ export class TuringMachine {
     }
 
     /**
-     * MÓDULO DE RESTA - Decrementa en 1 un número binario (operación unaria)
-     * Entrada: un número binario seguido de '_'
-     * Ejemplo: 101_ (5 - 1 = 4 en decimal = 100 en binario)
-     * 
-     * Tabla de transiciones:
-     * q0,1 -> q0,1,R
-     * q0,0 -> q0,0,R
-     * q0,_ -> q1,_,L
-     * q1,1 -> q2,_,L
-     * q1,0 -> qFIN,_,S
-     * q1,_ -> q3,_,L
-     * q2,1 -> q2,1,L
-     * q2,0 -> q2,0,L
-     * q2,_ -> q3,_,R
-     * q3,1 -> q0,_,R
+     * MÓDULO DE RESTA - (operación unaria)
      */
     moduloResta() {
         return {
@@ -157,9 +133,9 @@ export class TuringMachine {
         // 4. RETORNAR INFORMACIÓN PARA LA ANIMACIÓN
         return {
             status: 'RUNNING',
-            action: symbolChanged ? 'WRITE_AND_MOVE' : 'MOVE_ONLY', // Clave para tu animación
-            newSymbol: newSymbol,      // Qué símbolo escribir (para el dedo)
-            direction: direction       // Hacia dónde mover la cinta después
+            action: symbolChanged ? 'WRITE_AND_MOVE' : 'MOVE_ONLY', 
+            newSymbol: newSymbol,     
+            direction: direction       
         };
     }
 
