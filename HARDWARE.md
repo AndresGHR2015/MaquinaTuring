@@ -17,6 +17,7 @@ El objetivo es trasladar la simulación digital a un modelo físico funcional ut
 | **Arduino UNO** | Cerebro Central | Facilidad de uso, librerías robustas y suficientes pines I/O. | Gestiona la lógica de estados, lectura de sensores y coordinación de motores. |
 | **Motores NEMA 17 (x2)** | Tracción de Cinta | Requieren alto torque para mover la masa de la cinta y precisión milimétrica para posicionar las celdas. Los servos continuos no tienen la precisión necesaria. Alternativamente se puede utilizar otro motor paso a paso, pero se optó por este debido a las características mencionadas anteriormente.| Conectados a los ejes de los carretes (Direct Drive o polea). Se controlan mediante drivers **A4988** o **DRV8825**. Se mueven en sincronía para mantener la tensión. |
 | **Servo SG90** | Brazo Escritor | Es pequeño, ligero y suficiente para empujar una pieza plástica (slider) de 2 gramos. | Montado en el pilar frontal. Un brazo largo amplifica su movimiento para "golpear" el slider hacia la posición 0 o 1. |
+| **Botón** | Cambio de modo | Se eligió para poder conmutar entre suma y resta unaria de forma sencilla. Se podría complementar con una pantalla LED para visualizar el modo pero no es necesario | Montado en cualquier parte de la máquina. |
 
 ### 2.2. Sensores (El Cabezal de Lectura)
 
@@ -40,10 +41,11 @@ El sistema no depende de un solo sensor para validar al otro, sino que utiliza *
 
 ### 3.1. Sistema de Transporte
 
-  * **Carretes (x2):** Actúan como almacenamiento de la cinta infinita. Pueden ser de cualquier material siempre y cuando soporten la cinta correctamente.
+  * **Carretes (x2):** Actúan como almacenamiento de la cinta infinita. Pueden ser de cualquier material siempre y cuando soporten la cinta correctamente. Idealmente deben estar dentados para mejorar la mecánica paso a paso. Esto se puede hacer de forma casera o bien utilizando engranajes.
   * **Base de Madera:** Provee peso y rigidez. Fundamental para absorber la vibración de los motores NEMA 17, evitando que el sensor láser vibre y dé lecturas erróneas.
   * **Soportes de Carretes:** Torres robustas ancladas a la madera con rodamientos (tipo 608zz) para reducir la fricción del eje.
   * **Cinta Bi-color:** Cinta bi-color que se aprovechará para la escritura de símbolos con el uso de celdas.
+  * **Correa GT2 de 6 o 10mm:** Correa dentada que sostiene la cinta y marca los pasos de la máquina. Su uso es opcional, pero altamente recomendado si se busca máximo rendimiento.
 
 ### 3.2. Diseño de la Celda de Memoria
 
@@ -94,8 +96,9 @@ Este código está diseñado para ser copiado, ajustado y cargado. Utiliza libre
 
 ```cpp
 /**
- * FIRMWARE MÁQUINA DE TURING (VERSIÓN FINAL)
- * Hardware: 2x NEMA 17, 1x Servo SG90, 1x VL53L0X (Láser), 1x TCRT5000 (IR)
+ * FIRMWARE MÁQUINA DE TURING
+ * Hardware: 2x NEMA 17, 1x Servo SG90, 1x VL53L0X, 1x TCRT5000, 1x Botón
+ * Funcionalidad: Suma y Resta Unaria (conmutable)
  */
 
 #include <Servo.h>
@@ -104,28 +107,41 @@ Este código está diseñado para ser copiado, ajustado y cargado. Utiliza libre
 
 // --- 1. CONFIGURACIÓN DE PINES ---
 const int PIN_SERVO = 9;
-const int PIN_IR = A0;    // Sensor Analógico Infrarrojo
+const int PIN_IR = A0;      // Sensor Analógico Infrarrojo
+const int PIN_BOTON = 2;    // Botón para cambiar de modo (Conectar a GND y Pin 2)
 
 // Motores (Drivers A4988/DRV8825)
 const int STEP_L = 3; const int DIR_L = 4;
 const int STEP_R = 5; const int DIR_R = 6;
 
-// --- 2. CALIBRACIÓN (Ajustar estos valores en pruebas) ---
-const int PASOS_POR_CELDA = 200;   // Pasos del motor para mover 1 celda
-const int UMBRAL_NEGRO = 600;      // Lectura IR > 600 es Celda Negra (ajustar 0-1023)
-const int UMBRAL_PARED = 15;       // Distancia Láser < 15mm es Slider arriba
+// --- 2. CALIBRACIÓN Y CONSTANTES ---
+const int PASOS_POR_CELDA = 200;   // Pasos para mover 1 celda
+const int UMBRAL_NEGRO = 600;      // IR > 600 es Negro/Slider
+const int UMBRAL_PARED = 15;       // Distancia < 15mm es Slider arriba
+const int TIEMPO_ESPERA = 500;     // Pausa entre ciclos
 
-// Ángulos del Servo (Brazo Escritor)
+// Ángulos Servo
 const int ANGULO_REPOSO = 90;
 const int ANGULO_GOLPE = 45;
 
-// --- 3. OBJETOS GLOBALES ---
+// Estados especiales
+const int qFIN = -1; // Estado de finalización
+
+// --- 3. VARIABLES GLOBALES DE ESTADO ---
 Servo brazoEscritor;
 VL53L0X sensorLaser;
+
+int estadoActual = 0;       // q0, q1, q2...
+bool modoResta = false;     // false = Suma, true = Resta
+char simboloEscribir = ' '; 
+char direccionMover = 'S';  // S=Stop, R=Right, L=Left
 
 void setup() {
   Serial.begin(9600);
   Wire.begin();
+
+  // Configurar Botón (INPUT_PULLUP evita resistencia externa)
+  pinMode(PIN_BOTON, INPUT_PULLUP);
 
   // Iniciar Actuadores
   brazoEscritor.attach(PIN_SERVO);
@@ -142,94 +158,180 @@ void setup() {
   }
   sensorLaser.startContinuous();
   
-  Serial.println("Sistema Listo. Esperando cinta...");
+  Serial.println("--- SISTEMA INICIADO ---");
+  Serial.println("Modo actual: SUMA");
 }
 
 void loop() {
-  // --- CICLO DE MÁQUINA DE TURING ---
+  // A. VERIFICAR BOTÓN (CAMBIO DE MODO)
+  checkBoton();
 
-  // 1. Leer el estado actual de la cinta
-  char simboloActual = leerSimbolo();
+  // Si estamos en estado final, no hacemos nada más que esperar reset
+  if (estadoActual == qFIN) {
+    return;
+  }
+
+  // B. LEER CINTA
+  char simboloLeido = leerSimbolo();
   
-  Serial.print("Símbolo detectado: "); 
-  Serial.println(simboloActual);
+  Serial.print("Modo: "); Serial.print(modoResta ? "RESTA" : "SUMA");
+  Serial.print(" | Estado: q"); Serial.print(estadoActual);
+  Serial.print(" | Lee: "); Serial.println(simboloLeido);
 
-  // 2. Lógica de Estado (Ejemplo: Inversor simple)
-  // Aquí iría tu tabla de estados de Turing real (switch case)
-  char simboloEscribir = simboloActual;
-  char direccionMover = 'S'; // S=Stop, R=Right, L=Left
-
-  if (simboloActual == '0') {
-      simboloEscribir = '1';
-      direccionMover = 'R';
-  } else if (simboloActual == '1') {
-      simboloEscribir = '0';
-      direccionMover = 'R';
+  // C. EJECUTAR LÓGICA SEGÚN MODO
+  if (modoResta) {
+    ejecutarLogicaResta(simboloLeido);
+  } else {
+    ejecutarLogicaSuma(simboloLeido);
   }
 
-  // 3. Ejecutar Escritura (solo si cambia)
-  if (simboloEscribir != simboloActual && simboloActual != '_' && simboloActual != '?') {
-      escribirBit();
+  // D. ESCRIBIR (Si el símbolo cambia)
+  // Nota: '_' representa vacío/blanco en la lógica interna
+  if (simboloEscribir != simboloLeido) {
+      // Solo accionamos si es necesario cambiar físicamente
+      // Si leemos '1' y hay que escribir '0' o '_', golpeamos (si el mecanismo es toggle)
+      // O ajustamos según tu mecanismo específico de escritura.
+      // Asumiremos que escribir siempre requiere acción mecánica si es diferente.
+      escribirBit(); 
   }
 
-  // 4. Ejecutar Movimiento
+  // E. MOVER CINTA
   if (direccionMover != 'S') {
       moverCinta(direccionMover);
+  } else {
+    Serial.println(">>> MÁQUINA DETENIDA (HALT) <<<");
+    estadoActual = qFIN; // Forzar estado final visual
   }
   
-  delay(1000); // Espera para estabilidad
+  delay(TIEMPO_ESPERA);
 }
 
 // ==========================================
-// FUNCIONES DE CONTROL
+// LÓGICA DE MÁQUINA DE TURING (TABLAS)
 // ==========================================
 
-// --- LECTURA INTELIGENTE (TABLA DE VERDAD) ---
+void ejecutarLogicaSuma(char lee) {
+  // Inicializar por defecto (quedarse igual si no hay regla)
+  simboloEscribir = lee;
+  direccionMover = 'S';
+  int nuevoEstado = estadoActual;
+
+  switch (estadoActual) {
+    case 0: // q0
+      if (lee == '1')      { simboloEscribir = '1'; direccionMover = 'R'; nuevoEstado = 0; }
+      else if (lee == '0') { simboloEscribir = '1'; direccionMover = 'R'; nuevoEstado = 1; } // Convierte separador en 1
+      else if (lee == '_') { simboloEscribir = '_'; direccionMover = 'S'; nuevoEstado = qFIN; }
+      break;
+      
+    case 1: // q1
+      if (lee == '1')      { simboloEscribir = '1'; direccionMover = 'R'; nuevoEstado = 1; }
+      else if (lee == '_') { simboloEscribir = '_'; direccionMover = 'L'; nuevoEstado = 2; } // Fin de cadena, regresa
+      break;
+
+    case 2: // q2
+      if (lee == '1')      { simboloEscribir = '_'; direccionMover = 'S'; nuevoEstado = qFIN; } // Borra el último 1
+      break;
+  }
+  estadoActual = nuevoEstado;
+}
+
+void ejecutarLogicaResta(char lee) {
+  // Inicializar por defecto
+  simboloEscribir = lee;
+  direccionMover = 'S';
+  int nuevoEstado = estadoActual;
+
+  switch (estadoActual) {
+    case 0: // q0: Busca el separador
+      if (lee == '1')      { simboloEscribir = '1'; direccionMover = 'R'; nuevoEstado = 0; }
+      else if (lee == '0') { simboloEscribir = '0'; direccionMover = 'R'; nuevoEstado = 1; }
+      else if (lee == '_') { simboloEscribir = '_'; direccionMover = 'S'; nuevoEstado = qFIN; }
+      break;
+
+    case 1: // q1: Busca el final del segundo operando
+      if (lee == '1')      { simboloEscribir = '1'; direccionMover = 'R'; nuevoEstado = 1; }
+      else if (lee == '0') { simboloEscribir = '0'; direccionMover = 'R'; nuevoEstado = 1; }
+      else if (lee == '_') { simboloEscribir = '_'; direccionMover = 'L'; nuevoEstado = 2; }
+      break;
+
+    case 2: // q2: Intenta borrar un 1 del final (restar)
+      if (lee == '1')      { simboloEscribir = '_'; direccionMover = 'L'; nuevoEstado = 3; } // Borra y va a restar al inicio
+      else if (lee == '0') { simboloEscribir = '0'; direccionMover = 'S'; nuevoEstado = qFIN; } // Si encuentra 0, terminó
+      else if (lee == '_') { simboloEscribir = '_'; direccionMover = 'L'; nuevoEstado = 2; }
+      break;
+
+    case 3: // q3: Regresa a la izquierda buscando el primer operando
+      if (lee == '1')      { simboloEscribir = '1'; direccionMover = 'L'; nuevoEstado = 3; }
+      else if (lee == '0') { simboloEscribir = '0'; direccionMover = 'L'; nuevoEstado = 3; }
+      else if (lee == '_') { simboloEscribir = '_'; direccionMover = 'R'; nuevoEstado = 4; } // Tope izquierdo
+      break;
+
+    case 4: // q4: Borra un 1 del primer operando y reinicia
+      if (lee == '1')      { simboloEscribir = '_'; direccionMover = 'R'; nuevoEstado = 0; } // Borra y reinicia ciclo
+      else if (lee == '_') { simboloEscribir = '_'; direccionMover = 'R'; nuevoEstado = 4; } // Avanza buscando el 1
+      break;
+  }
+  estadoActual = nuevoEstado;
+}
+
+// ==========================================
+// CONTROL DE HARDWARE
+// ==========================================
+
+void checkBoton() {
+  if (digitalRead(PIN_BOTON) == LOW) { // Asumiendo INPUT_PULLUP (LOW = Presionado)
+    delay(50); // Debounce simple
+    if (digitalRead(PIN_BOTON) == LOW) {
+      modoResta = !modoResta; // Alternar modo
+      estadoActual = 0;       // Reiniciar máquina
+      
+      Serial.println("\n-----------------------");
+      Serial.print("CAMBIO DE MODO: ");
+      Serial.println(modoResta ? "RESTA" : "SUMA");
+      Serial.println("Reiniciando a q0...");
+      Serial.println("-----------------------\n");
+      
+      // Esperar a que se suelte el botón para no alternar locamente
+      while(digitalRead(PIN_BOTON) == LOW) delay(10); 
+    }
+  }
+}
+
 char leerSimbolo() {
-  // A. Adquisición de datos en paralelo
   int lecturaIR = analogRead(PIN_IR); 
   int distanciaLaser = sensorLaser.readRangeContinuousMillimeters();
 
-  // B. Evaluación de condiciones físicas
-  bool esNegro = (lecturaIR > UMBRAL_NEGRO);       // ¿Veo material de celda?
-  bool esPared = (distanciaLaser < UMBRAL_PARED);  // ¿Veo slider levantado?
+  // DEBUG: Descomentar para calibrar
+  // Serial.print("IR:"); Serial.print(lecturaIR); 
+  // Serial.print(" Lsr:"); Serial.println(distanciaLaser);
 
-  // C. Decodificación (Tabla de Verdad)
-  if (esNegro && esPared) {
-      return '1';  // Celda presente + Slider arriba
-  } 
-  else if (esNegro && !esPared) {
-      return '0';  // Celda presente + Slider abajo
-  } 
-  else if (!esNegro && !esPared) {
-      return '_';  // Cinta blanca vacía (Blank)
-  } 
-  else {
-      return '?';  // Error: IR ve blanco pero Láser choca con algo
-  }
+  bool esNegro = (lecturaIR > UMBRAL_NEGRO);      
+  bool esPared = (distanciaLaser < UMBRAL_PARED); 
+
+  if (esNegro && esPared)       return '1'; 
+  else if (esNegro && !esPared) return '0'; 
+  else                          return '_'; // Asumimos blanco o vacío como Blank
 }
 
-// --- MOVIMIENTO MECÁNICO ---
 void moverCinta(char dir) {
-  // Configurar dirección (Asumiendo motores en espejo)
+  // Configurar dirección (Ajustar según cableado de tus motores)
   if (dir == 'R') {
-    digitalWrite(DIR_L, HIGH); digitalWrite(DIR_R, HIGH);
+    digitalWrite(DIR_L, HIGH); digitalWrite(DIR_R, HIGH); // Mover cinta a la izquierda (cabeza a derecha)
   } else {
-    digitalWrite(DIR_L, LOW); digitalWrite(DIR_R, LOW);
+    digitalWrite(DIR_L, LOW); digitalWrite(DIR_R, LOW);   // Mover cinta a la derecha (cabeza a izquierda)
   }
 
-  // Mover pasos con retardo para torque
+  // Mover pasos
   for (int i = 0; i < PASOS_POR_CELDA; i++) {
     digitalWrite(STEP_L, HIGH); digitalWrite(STEP_R, HIGH);
-    delayMicroseconds(2000); // Velocidad lenta para fuerza
+    delayMicroseconds(2000); 
     digitalWrite(STEP_L, LOW); digitalWrite(STEP_R, LOW);
     delayMicroseconds(2000);
   }
 }
 
-// --- ESCRITURA (GOLPE) ---
 void escribirBit() {
-  Serial.println("Accionando brazo...");
+  Serial.print("ESCRIBIENDO: "); Serial.println(simboloEscribir);
   brazoEscritor.write(ANGULO_GOLPE);
   delay(300); 
   brazoEscritor.write(ANGULO_REPOSO);
