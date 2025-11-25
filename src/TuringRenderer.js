@@ -27,6 +27,7 @@ export class TuringRenderer {
         this.createHeadSupport(); 
         this.createTape();
         this.createHead();
+        this.createRollers();
     }
 
     /**
