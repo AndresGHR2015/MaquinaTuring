@@ -238,6 +238,9 @@ void escribirBit() {
 ```
 
 ## 6\. Diagrama de conexiones electrónicas para los componentes
+
+A continuación se muestra el código fuente del diagrama. En caso de no poder visualizar en el .md, copiar y pegar el código fuente en un editor mermaid. (e.g. <https://mermaid.live>)
+
 ```mermaid
 graph TD
     classDef ard fill:#00979D,stroke:#333,stroke-width:2px,color:white;
@@ -245,17 +248,17 @@ graph TD
     classDef motor fill:#555,stroke:#333,stroke-width:2px,color:white;
     classDef sensor fill:#E1B300,stroke:#333,stroke-width:2px,color:white;
 
-    subgraph ALIMENTACION ["⚡ FUENTE DE ENERGÍA"]
+    subgraph ALIMENTACION ["FUENTE DE ENERGÍA"]
         V12[Fuente 12V Externa]:::pwr
         USB[USB 5V Arduino]:::pwr
         GND_COMUN((GND COMÚN)):::pwr
     end
 
-    subgraph CONTROLADOR ["🧠 UNIDAD DE CONTROL"]
+    subgraph CONTROLADOR ["UNIDAD DE CONTROL"]
         UNO[ARDUINO UNO]:::ard
     end
 
-    subgraph ACTUADORES ["⚙️ MOTORES Y BRAZO"]
+    subgraph ACTUADORES ["MOTORES Y BRAZO"]
         DRV1[Driver A4988 - IZQ]:::motor
         DRV2[Driver A4988 - DER]:::motor
         SERVO[Servo SG90 - BRAZO]:::motor
@@ -263,7 +266,7 @@ graph TD
         NEMA2(Motor NEMA 17 #2):::motor
     end
 
-    subgraph SENSORES ["👁️ CABEZAL DE LECTURA"]
+    subgraph SENSORES ["CABEZAL DE LECTURA"]
         IR[Sensor IR TCRT5000]:::sensor
         LASER[Láser VL53L0X]:::sensor
     end
