@@ -39,36 +39,62 @@
 ## FASE FINAL: Desarrollo de Código (Simulación 3D)
 **Período:** 23 de octubre - 25 de noviembre
 
-### Entrada: 25/10
+### Entrada: 25/10 - Configuración Inicial
 **Responsable:** Andrés Hidalgo
 **Avance:** Se configuró el proyecto utilizando **Vite** para el empaquetado y **Three.js** para la visualización.
-**Estructura:** Se decidió separar la lógica matemática de la visualización:
-1.  `TuringMachine.js`: Clase que maneja el array de datos (la cinta) y los estados.
-2.  `TuringRenderer.js`: Clase encargada de pintar los cubos y el cabezal en 3D.
+**Estructura:** Se decidió separar la lógica matemática de la visualización en `TuringMachine.js` (Lógica) y `TuringRenderer.js` (Gráficos).
 
-### Entrada: 05/11
+### Entrada: 05/11 - Ajuste de Alcance
 **Responsable:** Catalina Araya
-**Actividad:** En revisión con el profesor, se nos indicó que la prioridad es que la máquina funcione sin errores.
-**Cambios:**
-* **Eliminación de multiplicación:** Se acordó eliminar la operación de multiplicación siguiendo los comentarios del profesor.
-* **Nota:** Se nos exigió que el cambio de estado y la escritura en cinta sean evidentes visualmente.
+**Actividad:** En revisión con el profesor, se indicó priorizar el funcionamiento sin errores.
+**Cambios:** Se eliminó la multiplicación y se definió que la escritura en cinta debe ser visualmente evidente.
 
-### Entrada: 12/11
+### Entrada: 12/11 - Lógica Matemática
 **Responsables:** Ambos
-**Desarrollo:** Programación de la clase `TuringMachine`.
-* Se implementó un sistema modular: `moduloSuma()` y `moduloResta()`.
-* **Corrección de documentación:** Aunque inicialmente pensamos la lógica en unario puro, el código se optimizó para trabajar con estados que procesan símbolos `0` y `1` en la cinta, permitiendo operaciones de incremento y decremento de manera más eficiente y ordenada para la visualización.
-* **Nota:** Se encontraron discrepancias en los comentarios generados automáticamente por el asistente de código, pero se verificó manualmente que la lógica de transición `q0` -> `q1` -> `qFIN` ejecuta la operación correctamente sobre la cinta.
+**Desarrollo:** Programación de la clase `TuringMachine`. Implementación de módulos de suma y resta. Corrección de la lógica de transición `q0` -> `q1` -> `qFIN`.
 
-### Entrada: 18/11 - Visualización e Interfaz (TuringRenderer.js)
+### Entrada: 15/11 - Control de Versiones
 **Responsable:** Andrés Hidalgo
-**Desarrollo:** Se implementó la cinta infinita visual.
-* Se crearon geometrías 3D para representar las celdas.
-* Se añadió un "Cabezal" (cono rojo/verde) que se anima físicamente al cambiar de módulo, simulando el intercambio de hardware que hubiese ocurrido en la máquina física.
+**Hito:** Primer commit oficial al repositorio.
+* `Initial commit: Simulador de Máquina de Turing con Three.js`.
 
-### Entrada: 21/11 - Pruebas Finales y Pulido
-**Responsables:** Ambos
-**Estado:**
+### Entrada: 19/11 - Lógica Core y Esqueleto
+**Responsable:** Andrés Hidalgo
+**Desarrollo:** Se consolidó la lógica de los autómatas y la estructura base de la cinta.
+* **Commits:**
+    * Implementación de autómatas suma y resta funcionales.
+    * Esqueleto de la cinta y el cabezal funcional implementado.
+    * Reajuste de autómatas y finalización de primer prototipo cinta funcional.
+
+### Entrada: 22/11 - Documentación y Diseño Visual
+**Responsables:** Catalina Araya (Documentación) / Andrés Hidalgo (Diseño 3D)
+**Desarrollo:** Se trabajó en la documentación técnica del hardware descartado y el diseño final de la cinta 3D.
+* **Commits (Andrés):**
+    * Diseño de la cinta finalizado.
+* **Commits (Catalina):**
+    * Documentación técnica: Respaldo de specs hardware (Arduino/TCRT5000).
+    * Bitácora del proyecto y documentación de fases.
+    * Edición del README para claridad y formato.
+
+### Entrada: 23/11 - Implementación de Hardware Simulado
+**Responsable:** Andrés Hidalgo
+**Desarrollo:** Integración masiva de componentes 3D para simular la máquina física (Digital Twin).
+* **Commits:**
+    * Simulación realista de lectura de símbolos con sensor de distancia láser + sensor IR funcional implementada.
+    * Mejora UI/UX del menú de interacción.
+    * Rodillos creados.
+    * Soporte implementado + Servo motores + Arduino.
+    * Cabezal implementado + Animación de marcado/cambio de símbolos.
+
+### Entrada: 25/11 - Despliegue y Entrega Final
+**Responsable:** Andrés Hidalgo
+**Desarrollo:** Correcciones finales de rutas para GitHub Pages y cierre de documentación.
+* **Commits:**
+    * Finalización de documentación + despliegue.
+    * Corrección de despliegue (configuración de Vite `base`).
+    * Update README.md.
+
+### Estado Final del Proyecto
 * [x] La máquina lee el input correctamente.
 * [x] Los botones de control (Play, Pause, Step) funcionan.
 * [x] La operación de Resta maneja correctamente el retroceso del cabezal.
