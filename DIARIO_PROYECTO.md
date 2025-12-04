@@ -27,14 +27,14 @@ Se entregó la documentación teórica bajo esta premisa.
 
 ### Entrada: 30/09
 **Responsable:** Andrés Hidalgo
-**Avance:** Recopilación de cotizaciones de componentes(Arduino,motores,NEMA 17, sensores).
-**Nota importante:** El costo de los materiales de alta fidelidad (carriles, sensores ) excede el presupuesto. El uso de alternativas económicas genera fallos criticos (atascos, errores de lectura),se continuara buscando una solución que redusca el riesgo de errores en la maquina.
+**Avance:** Recopilación de cotizaciones de componentes(Arduino, motores NEMA 17, sensores).
+**Nota importante:** El costo de los materiales de alta fidelidad (carriles, sensores) excede el presupuesto. El uso de alternativas económicas genera fallos criticos (atascos, errores de lectura). Se continuará buscando una solución que reduzca el riesgo de errores en la maquina.
 
 ### Entrada: 15/10
 **Responsables:** Ambos
 **Avance:** Evaluación de riesgo y vialidad fisica.
 **Decisión final:** Se descartó el montaje físico.
-**Justificación:** La probabilidad  de fallo mecánico era inaceptablemente alto para la presentacion. Se optó por una simulación web que permite visualizar la lógica; además, está alineada con los alcances autorizados por el docente.
+**Justificación:** La probabilidad de fallo mecánico era inaceptablemente alto para la presentacion. Se optó por una simulación web que permite visualizar la lógica; además, está alineada con los alcances autorizados por el docente.
 
 ---
 
