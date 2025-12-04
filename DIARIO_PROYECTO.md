@@ -2,12 +2,12 @@
 
 **Asignatura:** Fundamentos de la Computación
 **Profesor:** José Luis Veas
-**Integrantes:**
+**Equipo de proyecto:**
 * Andrés Hidalgo
 * Catalina Araya
 
 **Estado:** Finalizado (Digital)
-**Tecnologías:** JavaScript (ES6), Three.js, Vite.
+**Tecnologías implementadas:** JavaScript (ES6), Three.js, Vite.
 
 ---
 
@@ -16,8 +16,9 @@
 
 ### Entrada: 01/09
 **Responsables:** Ambos
-**Decisión final:** Se diseñaron las tablas de estados teóricas basadas en **Sistema Unario**.
-**Justificación:** El sistema unario facilita la comprensión de la lógica básica de Turing sin la complejidad del acarreo de bits. Se entregó la documentación teórica bajo esta premisa.
+**Decisión final:** Implementar las tablas de estado teóricas basadas en  **Sistema Unario**.
+**Justificación:** Se priorizó la simplicidad lógica para asegurar la correcta demostración de los principios fundamentales de la maquina de turing , evitando la complejidad del acarreo binario.
+Se entregó la documentación teórica bajo esta premisa.
 
 ---
 
@@ -26,31 +27,33 @@
 
 ### Entrada: 30/09
 **Responsable:** Andrés Hidalgo
-**Avance:** Cotizaciones preliminares con Arduino y componentes.
-**Nota importante:** El costo de los materiales (carriles, sensores de alta fidelidad) supera el presupuesto. Las pruebas con materiales caseros resultaban en atascos constantes de la cinta y lecturas erróneas.
+**Avance:** Recopilación de cotizaciones de componentes(Arduino,motores,NEMA 17, sensores).
+**Nota importante:** El costo de los materiales de alta fidelidad (carriles, sensores ) excede el presupuesto. El uso de alternativas económicas genera fallos criticos (atascos, errores de lectura),se continuara buscando una solución que redusca el riesgo de errores en la maquina.
 
 ### Entrada: 15/10
 **Responsables:** Ambos
+**Avance:** Evaluación de riesgo y vialidad fisica.
 **Decisión final:** Se descartó el montaje físico.
-**Justificación:** El riesgo de fallo mecánico durante la presentación era demasiado alto. Se optó por una simulación web que permite visualizar la lógica; además, esto está dentro de los límites autorizados por el profesor.
+**Justificación:** La probabilidad  de fallo mecánico era inaceptablemente alto para la presentacion. Se optó por una simulación web que permite visualizar la lógica; además, está alineada con los alcances autorizados por el docente.
 
 ---
 
-## FASE FINAL: Desarrollo de Código (Simulación 3D)
+## FASE 3: Desarrollo de Código (Simulación 3D)
 **Período:** 23 de octubre - 25 de noviembre
 
 ### Entrada: 25/10 - Configuración Inicial
 **Responsable:** Andrés Hidalgo
-**Avance:** Se configuró el proyecto utilizando **Vite** para el empaquetado y **Three.js** para la visualización.
-**Estructura:** Se decidió separar la lógica matemática de la visualización en `TuringMachine.js` (Lógica) y `TuringRenderer.js` (Gráficos).
+**Avance:** Se configuró el proyecto utilizando **Vite** para el empaquetado y **Three.js** para la visualización (entorno de desarrollo).
+**Observaciones:** Se decidió separar la lógica matemática de la visualización en `TuringMachine.js` (Lógica) y `TuringRenderer.js` (Gráficos).
 
 ### Entrada: 05/11 - Ajuste de Alcance
 **Responsable:** Catalina Araya
-**Actividad:** En revisión con el profesor, se indicó priorizar el funcionamiento sin errores.
-**Cambios:** Se eliminó la multiplicación y se definió que la escritura en cinta debe ser visualmente evidente.
+**Actividad:** En revisión con el profesor, se indicó priorizar el funcionamiento sin errores.(Ajuste de alcance funcional)
+**Cambios:** tras la revision con el profesor, se elimino las función de multiplicación para priorizar el funcinamiento estable y poder procesar sin errores las funciones de **Suma** y **Resta**, la escritura en la cinta debe ser perfecta.
 
 ### Entrada: 12/11 - Lógica Matemática
 **Responsables:** Ambos
+**Avance:** Consolidación de la lógica matematica.
 **Desarrollo:** Programación de la clase `TuringMachine`. Implementación de módulos de suma y resta. Corrección de la lógica de transición `q0` -> `q1` -> `qFIN`.
 
 ### Entrada: 15/11 - Control de Versiones
