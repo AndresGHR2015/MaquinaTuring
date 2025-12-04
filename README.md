@@ -1,10 +1,10 @@
 # Simulación Digital de Máquina de Turing: Operaciones Aritméticas
 
 **Asignatura:** Fundamentos de la Computación
-**Profesor:** José Luis Veas
+**Profesor:** José Luis Veas Muñoz
 **Integrantes:**
-* Andrés Hidalgo
-* Catalina Araya
+* Andrés Hidalgo Ramallo, RUT: 21.795.550-5
+* Catalina Araya Avila, RUT: 21.791.560-0
 
 Este proyecto consiste en una implementación visual de una Máquina de Turing desarrollada con tecnologías web modernas (**Three.js** y **Vite**). El software simula la lógica de autómatas finitos para realizar operaciones aritméticas, visualizando el movimiento del cabezal y la modificación de la cinta en un entorno 3D.
 
