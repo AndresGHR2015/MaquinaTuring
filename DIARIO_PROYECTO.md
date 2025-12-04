@@ -1,10 +1,10 @@
 # DIARIO DE PROYECTO: MÁQUINA DE TURING
 
 **Asignatura:** Fundamentos de la Computación
-**Profesor:** José Luis Veas
+**Profesor:** José Luis Veas Muñoz
 **Equipo de proyecto:**
-* Andrés Hidalgo
-* Catalina Araya
+* Andrés Hidalgo Ramallo, RUT: 21.795.550-5
+* Catalina Araya Avila, RUT: 21.791.560-0
 
 **Estado:** Finalizado (Digital)
 **Tecnologías implementadas:** JavaScript (ES6), Three.js, Vite.
